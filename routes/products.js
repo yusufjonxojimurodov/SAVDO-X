@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const removeBackground = require("../utils/bg.remove");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -84,8 +85,6 @@ router.get("/my", tokenCheck, async (req, res) => {
   }
 });
 
-const removeBackground = require("../utils/removeBg");
-
 router.post(
   "/create-product",
   tokenCheck,
@@ -97,9 +96,7 @@ router.post(
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
-      // Yuklangan rasm yo‘lini olamiz
       const imagePath = path.join(__dirname, "../uploads", req.file.filename);
-      // remove.bg orqali fonni olib tashlaymiz
       const transparentImagePath = await removeBackground(imagePath);
 
       const newProduct = new ProductModel({
@@ -109,7 +106,7 @@ router.post(
         model,
         left,
         createdBy: req.userId,
-        image: `/uploads/${path.basename(transparentImagePath)}`, // PNG fayl
+        image: `/uploads/${path.basename(transparentImagePath)}`,
       });
       await newProduct.save();
 
