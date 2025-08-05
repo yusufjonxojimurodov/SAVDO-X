@@ -70,6 +70,4 @@ router.delete("/delete", tokenCheck, async (req, res) => {
   }
 });
 
-
-
 module.exports = router;

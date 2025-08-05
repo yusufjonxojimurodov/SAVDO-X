@@ -6,7 +6,8 @@ const bcrypt = require("bcrypt");
 const User = require("./models/userRegister.js");
 const path = require("path");
 const productsRouter = require("./routes/products.js");
-const basketRouter = require("./routes/basketProduct.js");
+const basketRouter = require("./routes/basketProduct.js")
+console.log("Products router nima?", productsRouter);
 
 require("dotenv").config();
 
