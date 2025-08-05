@@ -57,9 +57,9 @@ router.get("/", async (req, res) => {
     let sortOption = {};
     if (req.query.price) {
       if (req.query.price === "expensive") {
-        sortOption.price = -1; 
+        sortOption.price = -1;
       } else if (req.query.price === "cheap") {
-        sortOption.price = 1; 
+        sortOption.price = 1;
       }
     }
 
@@ -84,6 +84,8 @@ router.get("/my", tokenCheck, async (req, res) => {
   }
 });
 
+const removeBackground = require("../utils/removeBg");
+
 router.post(
   "/create-product",
   tokenCheck,
@@ -95,6 +97,11 @@ router.post(
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
+      // Yuklangan rasm yo‘lini olamiz
+      const imagePath = path.join(__dirname, "../uploads", req.file.filename);
+      // remove.bg orqali fonni olib tashlaymiz
+      const transparentImagePath = await removeBackground(imagePath);
+
       const newProduct = new ProductModel({
         name,
         description,
@@ -102,7 +109,7 @@ router.post(
         model,
         left,
         createdBy: req.userId,
-        image: `/uploads/${req.file.filename}`,
+        image: `/uploads/${path.basename(transparentImagePath)}`, // PNG fayl
       });
       await newProduct.save();
 
@@ -121,5 +128,3 @@ router.post(
     }
   }
 );
-
-module.exports = router;
