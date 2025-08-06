@@ -3,34 +3,13 @@ const router = express.Router();
 const ProductModel = require("../models/products");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
-const path = require("path");
+const axios = require("axios");
 const fs = require("fs");
-const removeBackground = require("../utils/bg.remove");
+const path = require("path");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../uploads");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath);
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
+const upload = multer({ dest: "temp/" }); // vaqtinchalik papka
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Faqat PNG yoki JPEG formatdagi rasm yuklash mumkin!"), false);
-  }
-};
-
-const upload = multer({ storage, fileFilter });
-
+// Token tekshiruvchi middleware
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Token topilmadi" });
@@ -43,6 +22,7 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
+// Barcha mahsulotlarni olish (filtr va sort bilan)
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -75,6 +55,7 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Foydalanuvchining o‘z mahsulotlari
 router.get("/my", tokenCheck, async (req, res) => {
   try {
     const myProducts = await ProductModel.find({ createdBy: req.userId });
@@ -85,6 +66,7 @@ router.get("/my", tokenCheck, async (req, res) => {
   }
 });
 
+// Yangi mahsulot yaratish (ImgBB yuklash bilan)
 router.post(
   "/create-product",
   tokenCheck,
@@ -96,9 +78,22 @@ router.post(
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
-      const imagePath = path.join(__dirname, "../uploads", req.file.filename);
-      const transparentImagePath = await removeBackground(imagePath);
+      // Faylni o‘qib base64 ga o‘tkazamiz
+      const imageBuffer = fs.readFileSync(req.file.path);
+      const imageBase64 = imageBuffer.toString("base64");
 
+      // ImgBB ga yuklash
+      const response = await axios.post(
+        `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+        { image: imageBase64 }
+      );
+
+      // vaqtinchalik faylni o‘chiramiz
+      fs.unlinkSync(req.file.path);
+
+      const imageUrl = response.data.data.url;
+
+      // Yangi mahsulot yaratamiz
       const newProduct = new ProductModel({
         name,
         description,
@@ -106,7 +101,7 @@ router.post(
         model,
         left,
         createdBy: req.userId,
-        image: `/uploads/${path.basename(transparentImagePath)}`,
+        image: imageUrl, // ImgBB URL saqlanadi
       });
       await newProduct.save();
 
@@ -119,7 +114,7 @@ router.post(
       if (err.name === "ValidationError")
         return res
           .status(404)
-          .json({ message: "Notogri ma'lumot yuborildi !" });
+          .json({ message: "Notog‘ri ma'lumot yuborildi!" });
       console.error(err);
       res.status(500).json({ message: "Server xatosi" });
     }
