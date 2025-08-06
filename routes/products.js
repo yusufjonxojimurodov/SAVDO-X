@@ -5,11 +5,10 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const axios = require("axios");
 const fs = require("fs");
-const path = require("path");
+const FormData = require("form-data"); 
 
-const upload = multer({ dest: "temp/" }); // vaqtinchalik papka
+const upload = multer({ dest: "temp" });
 
-// Token tekshiruvchi middleware
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Token topilmadi" });
@@ -22,7 +21,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// Barcha mahsulotlarni olish (filtr va sort bilan)
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -55,7 +53,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Foydalanuvchining o‘z mahsulotlari
 router.get("/my", tokenCheck, async (req, res) => {
   try {
     const myProducts = await ProductModel.find({ createdBy: req.userId });
@@ -66,7 +63,6 @@ router.get("/my", tokenCheck, async (req, res) => {
   }
 });
 
-// Yangi mahsulot yaratish (ImgBB yuklash bilan)
 router.post(
   "/create-product",
   tokenCheck,
@@ -82,18 +78,21 @@ router.post(
       const imageBuffer = fs.readFileSync(req.file.path);
       const imageBase64 = imageBuffer.toString("base64");
 
-      // ImgBB ga yuklash
+      // FormData tayyorlaymiz
+      const formData = new FormData();
+      formData.append("image", imageBase64);
+
+      // ImgBB ga yuklaymiz
       const response = await axios.post(
         `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
-        { image: imageBase64 }
+        formData,
+        { headers: formData.getHeaders() }
       );
 
       // vaqtinchalik faylni o‘chiramiz
       fs.unlinkSync(req.file.path);
 
       const imageUrl = response.data.data.url;
-
-      // Yangi mahsulot yaratamiz
       const newProduct = new ProductModel({
         name,
         description,
@@ -101,7 +100,7 @@ router.post(
         model,
         left,
         createdBy: req.userId,
-        image: imageUrl, // ImgBB URL saqlanadi
+        image: imageUrl,
       });
       await newProduct.save();
 
@@ -111,11 +110,11 @@ router.post(
 
       res.status(201).json(populatedProduct);
     } catch (err) {
+      console.error("ImgBB Error:", err.response?.data || err);
       if (err.name === "ValidationError")
         return res
           .status(404)
           .json({ message: "Notog‘ri ma'lumot yuborildi!" });
-      console.error(err);
       res.status(500).json({ message: "Server xatosi" });
     }
   }
