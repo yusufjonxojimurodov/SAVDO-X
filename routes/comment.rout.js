@@ -20,7 +20,6 @@ router.post("/create/comment", tokenCheck, async (req, res) => {
   try {
     const { productId, text, rating } = req.body;
 
-    // ✅ Rating qiymatini tekshirish
     if (!["happy", "unhappy"].includes(rating)) {
       return res.status(400).json({ message: "Rating qiymati noto‘g‘ri" });
     }
@@ -47,6 +46,21 @@ router.post("/create/comment", tokenCheck, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Komment qo‘shishda xatolik yuz berdi" });
+  }
+});
+
+router.get("/:productId", async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    const comments = await Comment.find({ productId })
+      .populate("userId", "name surname")
+      .sort({ createdAt: -1 });
+
+    res.json(comments);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Kommentlarni olishda xatolik" });
   }
 });
 
