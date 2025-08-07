@@ -7,7 +7,7 @@ const User = require("./models/userRegister.js");
 const path = require("path");
 const productsRouter = require("./routes/products.js");
 const basketRouter = require("./routes/basketProduct.js");
-console.log("Products router nima?", productsRouter);
+const commentRouter = require("./routes/comment.rout.js");
 
 require("dotenv").config();
 
@@ -17,6 +17,7 @@ users.use(express.json());
 users.use("/uploads", express.static(path.join(__dirname, "uploads")));
 users.use("/get/all/products", productsRouter);
 users.use("/basket", basketRouter);
+users.use("/api/comments", commentRouter);
 
 mongoose
   .connect(process.env.MONGO_URI, {
