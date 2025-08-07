@@ -8,6 +8,7 @@ const fs = require("fs");
 const FormData = require("form-data");
 const sharp = require("sharp");
 const permission = require("../utils/roleCheck.js");
+const Comment = require("../models/coment.js");
 const { removeBackgroundFromImageFile } = require("remove.bg");
 
 const upload = multer({ dest: "temp/" });
@@ -49,7 +50,29 @@ router.get("/", async (req, res) => {
       .populate("createdBy", "userName")
       .sort(sortOption);
 
-    res.json(products);
+    const productsWithRating = await Promise.all(
+      products.map(async (product) => {
+        const happyCount = await Comment.countDocuments({
+          productId: product._id,
+          sentiment: "happy",
+        });
+
+        const unhappyCount = await Comment.countDocuments({
+          productId: product._id,
+          sentiment: "unhappy",
+        });
+
+        return {
+          ...product.toObject(),
+          rating: {
+            happy: happyCount,
+            unhappy: unhappyCount,
+          },
+        };
+      })
+    );
+
+    res.json(productsWithRating);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });

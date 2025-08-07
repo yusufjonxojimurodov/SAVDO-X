@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Comment = require("../models/coment.js")
+const Comment = require("../models/coment.js");
 const Product = require("../models/products.js");
 const jwt = require("jsonwebtoken");
 
@@ -18,15 +18,23 @@ const tokenCheck = (req, res, next) => {
 
 router.post("/create/comment", tokenCheck, async (req, res) => {
   try {
-    const { productId, text } = req.body;
+    const { productId, text, rating } = req.body;
+
+    // ✅ Rating qiymatini tekshirish
+    if (!["happy", "unhappy"].includes(rating)) {
+      return res.status(400).json({ message: "Rating qiymati noto‘g‘ri" });
+    }
 
     const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ message: "Product topilmadi" });
+    if (!product) {
+      return res.status(404).json({ message: "Mahsulot topilmadi" });
+    }
 
     const newComment = new Comment({
       productId,
       text,
       userId: req.userId,
+      rating,
     });
 
     await newComment.save();
@@ -38,25 +46,9 @@ router.post("/create/comment", tokenCheck, async (req, res) => {
     res.status(201).json(populated);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Komment qo‘shishda xatolik" });
+    res.status(500).json({ message: "Komment qo‘shishda xatolik yuz berdi" });
   }
 });
-
-router.get("/:productId", async (req, res) => {
-  try {
-    const { productId } = req.params;
-
-    const comments = await Comment.find({ productId })
-      .populate("userId", "name surname")
-      .sort({ createdAt: -1 });
-
-    res.json(comments);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Kommentlarni olishda xatolik" });
-  }
-});
-
 
 router.delete("/delete/:id", tokenCheck, async (req, res) => {
   try {

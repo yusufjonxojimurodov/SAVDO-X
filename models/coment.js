@@ -11,6 +11,11 @@ const commentSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
+    rating: {
+      type: String,
+      enum: ["happy", "unhappy"],
+      required: true,
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
