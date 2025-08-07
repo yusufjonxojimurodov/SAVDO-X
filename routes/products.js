@@ -62,11 +62,21 @@ router.get("/", async (req, res) => {
           sentiment: "unhappy",
         });
 
+        const total = happyCount + unhappyCount;
+
+        let happyPercent = 0;
+        let unhappyPercent = 0;
+
+        if (total > 0) {
+          happyPercent = Math.round((happyCount / total) * 100);
+          unhappyPercent = 100 - happyPercent;
+        }
+
         return {
           ...product.toObject(),
           rating: {
-            happy: happyCount,
-            unhappy: unhappyCount,
+            happy: happyPercent,
+            unhappy: unhappyPercent,
           },
         };
       })
