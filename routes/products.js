@@ -54,12 +54,12 @@ router.get("/", async (req, res) => {
       products.map(async (product) => {
         const happyCount = await Comment.countDocuments({
           productId: product._id,
-          sentiment: "happy",
+          rating: "happy",
         });
 
         const unhappyCount = await Comment.countDocuments({
           productId: product._id,
-          sentiment: "unhappy",
+          rating: "unhappy",
         });
 
         const total = happyCount + unhappyCount;
