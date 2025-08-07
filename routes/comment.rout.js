@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Comment = require("../models/coment.js")
 const Product = require("../models/products.js");
+const jwt = require("jsonwebtoken");
 
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -19,7 +20,6 @@ router.post("/create/comment", tokenCheck, async (req, res) => {
   try {
     const { productId, text } = req.body;
 
-    // Product mavjudligini tekshiramiz
     const product = await Product.findById(productId);
     if (!product) return res.status(404).json({ message: "Product topilmadi" });
 
