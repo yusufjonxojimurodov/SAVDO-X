@@ -7,6 +7,7 @@ const axios = require("axios");
 const fs = require("fs");
 const FormData = require("form-data");
 const sharp = require("sharp");
+const permission = require("../utils/roleCheck.js");
 const { removeBackgroundFromImageFile } = require("remove.bg");
 
 const upload = multer({ dest: "temp/" });
@@ -23,7 +24,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// ===== GET ALL PRODUCTS =====
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -56,20 +56,24 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ===== GET MY PRODUCTS =====
-router.get("/my", tokenCheck, async (req, res) => {
-  try {
-    const myProducts = await ProductModel.find({ createdBy: req.userId });
-    res.json(myProducts);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server xatosi" });
+router.get(
+  "/my",
+  permission(["admin", "seller"]),
+  tokenCheck,
+  async (req, res) => {
+    try {
+      const myProducts = await ProductModel.find({ createdBy: req.userId });
+      res.json(myProducts);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server xatosi" });
+    }
   }
-});
+);
 
-// ===== CREATE PRODUCT (WITH remove.bg, sharp, imgbb) =====
 router.post(
   "/create-product",
+  permission(["admin", "seller"]),
   tokenCheck,
   upload.single("image"),
   async (req, res) => {
@@ -82,7 +86,6 @@ router.post(
       const inputPath = req.file.path;
       const outputPath = `uploads/${Date.now()}-no-bg.png`;
 
-      // remove.bg orqali fonni olib tashlash
       const result = await removeBackgroundFromImageFile({
         path: inputPath,
         apiKey: process.env.REMOVE_BG_API_KEY,
@@ -90,12 +93,10 @@ router.post(
         type: "auto",
       });
 
-      // PNG faylga saqlash
       await sharp(Buffer.from(result.base64img, "base64"))
         .png()
         .toFile(outputPath);
 
-      // imgbb ga yuklash
       const imageBuffer = fs.readFileSync(outputPath);
       const imageBase64 = imageBuffer.toString("base64");
 
@@ -108,7 +109,6 @@ router.post(
         { headers: formData.getHeaders() }
       );
 
-      // vaqtinchalik faylni o‘chirish (original)
       fs.unlinkSync(inputPath);
 
       const imageUrl = response.data.data.url;

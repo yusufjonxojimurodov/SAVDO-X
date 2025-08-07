@@ -6,7 +6,7 @@ const bcrypt = require("bcrypt");
 const User = require("./models/userRegister.js");
 const path = require("path");
 const productsRouter = require("./routes/products.js");
-const basketRouter = require("./routes/basketProduct.js")
+const basketRouter = require("./routes/basketProduct.js");
 console.log("Products router nima?", productsRouter);
 
 require("dotenv").config();
@@ -101,6 +101,48 @@ users.get("/api/getUserMe", tokenCheck, async (request, response) => {
     response.json(user);
   } catch (error) {
     response.status(500).json({ message: "Server Xatoligi" });
+  }
+});
+
+users.put("/api/update-role/:id", tokenCheck, async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+    if (adminUser.role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "Faqat admin rol o‘zgartira oladi" });
+    }
+
+    const { role } = req.body;
+    if (!["admin", "seller", "customer"].includes(role)) {
+      return res.status(400).json({ message: "Yaroqsiz rol" });
+    }
+
+    const userToUpdate = await User.findById(req.params.id);
+    if (!userToUpdate) {
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+    }
+
+    if (role === "admin") {
+      const existingAdmin = await User.findOne({ role: "admin" });
+      if (
+        existingAdmin &&
+        existingAdmin._id.toString() !== userToUpdate._id.toString()
+      ) {
+        return res.status(400).json({ message: "Allaqachon admin mavjud" });
+      }
+    }
+
+    userToUpdate.role = role;
+    await userToUpdate.save();
+
+    res.json({
+      message: "Foydalanuvchi roli o‘zgartirildi",
+      user: userToUpdate,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
   }
 });
 

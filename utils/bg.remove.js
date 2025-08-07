@@ -15,7 +15,7 @@ async function removeBackground(inputPath) {
       {
         headers: {
           ...formData.getHeaders(),
-          "X-Api-Key": process.env.REMOVE_BG_API_KEY, // Render Settings’da Environment’da bo‘lishi shart
+          "X-Api-Key": process.env.REMOVE_BG_API_KEY, 
         },
         responseType: "arraybuffer",
       }
@@ -26,7 +26,6 @@ async function removeBackground(inputPath) {
     return outputFile;
   } catch (error) {
     console.error("Remove.bg xatosi:", error.response?.data || error.message);
-    // API ishlamasa, eski faylni qaytaramiz (fon olib tashlanmagan)
     return inputPath;
   }
 }

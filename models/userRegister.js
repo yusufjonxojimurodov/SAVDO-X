@@ -2,12 +2,8 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const schemaCreateAccount = new mongoose.Schema({
-  name: {
-    type: String,
-  },
-  surname: {
-    type: String,
-  },
+  name: String,
+  surname: String,
   userName: {
     type: String,
     required: [true, "User Name kiritilishi shart"],
@@ -16,6 +12,11 @@ const schemaCreateAccount = new mongoose.Schema({
   password: {
     type: String,
     required: [true, "Parol kiritilishi shart"],
+  },
+  role: {
+    type: String,
+    enum: ["admin", "seller", "customer", 'blocked'],
+    default: "customer",
   },
 });
 
@@ -26,5 +27,4 @@ schemaCreateAccount.pre("save", async function (next) {
 });
 
 const User = mongoose.model("User", schemaCreateAccount);
-
 module.exports = User;
