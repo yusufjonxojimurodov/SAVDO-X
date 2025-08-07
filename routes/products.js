@@ -141,4 +141,22 @@ router.post(
   }
 );
 
+router.get("/:id", async (req, res) => {
+  try {
+    const product = await ProductModel.findById(req.params.id).populate(
+      "createdBy",
+      "userName"
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: "Mahsulot topilmadi" });
+    }
+
+    res.json(product);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
 module.exports = router;
