@@ -1,14 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const ProductModel = require("../models/products");
-const jwt = require("jsonwebtoken");
 const multer = require("multer");
-const axios = require("axios");
 const fs = require("fs");
-const FormData = require("form-data"); 
+const FormData = require("form-data");
+const axios = require("axios");
+const sharp = require("sharp");
+const path = require("path");
 
-const upload = multer({ dest: "temp" });
+const ProductModel = require("../models/products");
+const { removeBackgroundFromImageFile } = require("remove.bg");
 
+const upload = multer({ dest: "temp/" });
+
+const jwt = require("jsonwebtoken");
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Token topilmadi" });
@@ -21,48 +25,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-router.get("/", async (req, res) => {
-  try {
-    const filter = {};
-
-    if (req.query.model) {
-      filter.model = req.query.model;
-    }
-
-    if (req.query.search) {
-      filter.name = { $regex: req.query.search, $options: "i" };
-    }
-
-    let sortOption = {};
-    if (req.query.price) {
-      if (req.query.price === "expensive") {
-        sortOption.price = -1;
-      } else if (req.query.price === "cheap") {
-        sortOption.price = 1;
-      }
-    }
-
-    const products = await ProductModel.find(filter)
-      .populate("createdBy", "userName")
-      .sort(sortOption);
-
-    res.json(products);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server xatosi" });
-  }
-});
-
-router.get("/my", tokenCheck, async (req, res) => {
-  try {
-    const myProducts = await ProductModel.find({ createdBy: req.userId });
-    res.json(myProducts);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server xatosi" });
-  }
-});
-
 router.post(
   "/create-product",
   tokenCheck,
@@ -70,29 +32,48 @@ router.post(
   async (req, res) => {
     try {
       const { name, description, price, left, model } = req.body;
+
       if (!req.file) {
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
-      // Faylni o‘qib base64 ga o‘tkazamiz
-      const imageBuffer = fs.readFileSync(req.file.path);
+      const inputPath = req.file.path;
+      const outputPath = `uploads/${Date.now()}-no-bg.png`;
+
+      // remove.bg bilan fonni olib tashlash
+      const result = await removeBackgroundFromImageFile({
+        path: inputPath,
+        apiKey: process.env.REMOVE_BG_API_KEY,
+        size: "auto",
+        type: "auto",
+      });
+
+      // result.base64img ni PNG faylga aylantirib saqlash
+      await sharp(Buffer.from(result.base64img, "base64"))
+        .png()
+        .toFile(outputPath);
+
+      // ImgBB uchun faylni base64 formatga o‘tkazamiz
+      const imageBuffer = fs.readFileSync(outputPath);
       const imageBase64 = imageBuffer.toString("base64");
 
-      // FormData tayyorlaymiz
       const formData = new FormData();
       formData.append("image", imageBase64);
 
-      // ImgBB ga yuklaymiz
+      // ImgBB ga yuklash
       const response = await axios.post(
         `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
         formData,
         { headers: formData.getHeaders() }
       );
 
-      // vaqtinchalik faylni o‘chiramiz
-      fs.unlinkSync(req.file.path);
+      // vaqtinchalik fayllarni o‘chirish
+      fs.unlinkSync(inputPath); // original yuklangan fayl
+      // outputPath saqlab qoling — serverda rasm sifatida kerak bo‘lsa
 
       const imageUrl = response.data.data.url;
+
+      // Mahsulotni saqlash
       const newProduct = new ProductModel({
         name,
         description,
@@ -104,17 +85,14 @@ router.post(
       });
       await newProduct.save();
 
+      // userName ni populate qilish
       const populatedProduct = await ProductModel.findById(
         newProduct._id
       ).populate("createdBy", "userName");
 
       res.status(201).json(populatedProduct);
     } catch (err) {
-      console.error("ImgBB Error:", err.response?.data || err);
-      if (err.name === "ValidationError")
-        return res
-          .status(404)
-          .json({ message: "Notog‘ri ma'lumot yuborildi!" });
+      console.error("Xatolik:", err.response?.data || err);
       res.status(500).json({ message: "Server xatosi" });
     }
   }
