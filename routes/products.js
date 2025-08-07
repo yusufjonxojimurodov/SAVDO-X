@@ -58,8 +58,8 @@ router.get("/", async (req, res) => {
 
 router.get(
   "/my",
-  permission(["admin", "seller"]),
   tokenCheck,
+  permission(["admin", "seller"]),
   async (req, res) => {
     try {
       const myProducts = await ProductModel.find({ createdBy: req.userId });
@@ -73,8 +73,8 @@ router.get(
 
 router.post(
   "/create-product",
-  permission(["admin", "seller"]),
   tokenCheck,
+  permission(["admin", "seller"]),
   upload.single("image"),
   async (req, res) => {
     try {
