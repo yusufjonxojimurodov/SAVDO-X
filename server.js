@@ -8,6 +8,7 @@ const path = require("path");
 const productsRouter = require("./routes/products.js");
 const basketRouter = require("./routes/basketProduct.js");
 const commentRouter = require("./routes/comment.rout.js");
+const avatarRouter = require("./routes/avatar.js");
 
 require("dotenv").config();
 
@@ -18,6 +19,7 @@ users.use("/uploads", express.static(path.join(__dirname, "uploads")));
 users.use("/get/all/products", productsRouter);
 users.use("/basket", basketRouter);
 users.use("/api/comments", commentRouter);
+users.use(avatarRouter);
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -146,6 +148,36 @@ users.put("/api/update-role/:id", tokenCheck, async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
+users.put(
+  "/api/update-profile",
+  tokenCheck,
+  async (req, res) => {
+    try {
+      const { name, surname, phone } = req.body;
+      const updateData = {};
+
+      if (name) updateData.name = name;
+      if (surname) updateData.surname = surname;
+      if (phone) updateData.phone = phone;
+  
+      const updatedUser = await User.findByIdAndUpdate(
+        req.userId,
+        { $set: updateData },
+        { new: true, select: "-password" }
+      );
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+      }
+
+      res.json({ message: "Profil yangilandi", user: updatedUser });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
 
 const PORT = process.env.PORT || 5000;
 users.listen(PORT, "0.0.0.0", () =>

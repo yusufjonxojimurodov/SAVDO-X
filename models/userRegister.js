@@ -13,9 +13,17 @@ const schemaCreateAccount = new mongoose.Schema({
     type: String,
     required: [true, "Parol kiritilishi shart"],
   },
+  phone: {
+    type: String,
+    default: "",
+  },
+  avatar: {
+    type: String,
+    default: "",
+  },
   role: {
     type: String,
-    enum: ["admin", "seller", "customer", 'blocked'],
+    enum: ["admin", "seller", "customer", "blocked"],
     default: "customer",
   },
 });
