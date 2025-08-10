@@ -25,6 +25,10 @@ const schemaCreateAccount = new mongoose.Schema({
     type: String,
     default: "",
   },
+  birthDate: {
+    type: Date,
+    default: "",
+  },
   role: {
     type: String,
     enum: ["admin", "seller", "customer", "blocked"],
