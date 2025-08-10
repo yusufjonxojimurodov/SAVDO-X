@@ -95,7 +95,18 @@ router.get(
   permission(["admin", "seller"]),
   async (req, res) => {
     try {
-      const myProducts = await ProductModel.find({ createdBy: req.userId });
+      const filter = { createdBy: req.userId };
+
+      if (req.query.search) {
+        filter.name = { $regex: req.query.search, $options: "i" };
+      }
+
+      if (req.query.model) {
+        filter.model = req.query.model;
+      }
+
+      const myProducts = await ProductModel.find(filter);
+
       res.json(myProducts);
     } catch (err) {
       console.error(err);

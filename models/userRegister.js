@@ -43,7 +43,7 @@ schemaCreateAccount.pre("save", async function (next) {
 });
 
 schemaCreateAccount.pre("save", function (next) {
-  if (this.birthDate) {
+  if (this.birthDate)  {
     this.birthDate.setUTCHours(0, 0, 0, 0);
   }
 
