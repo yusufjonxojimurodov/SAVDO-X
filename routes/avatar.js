@@ -9,6 +9,7 @@ const router = express.Router();
 
 const JWT_TOKEN = process.env.JWT_TOKEN;
 
+// Token tekshiruvchi middleware
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token)
@@ -22,15 +23,17 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
+// Multer sozlamalari - papka project root ichida "uploads/avatars"
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "uploads/avatars"));
+    cb(null, path.join(__dirname, "..", "uploads", "avatars"));
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `${req.params.id}_${Date.now()}${ext}`);
+    cb(null, `${req.userId}_${Date.now()}${ext}`);
   },
 });
+
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
@@ -40,9 +43,9 @@ const upload = multer({
   },
 });
 
-// POST - avatar yuklas
+// POST - avatar yuklash (yangi avatar yaratish)
 router.post(
-  "/api/users/:id/avatar",
+  "/api/users/avatar",
   tokenCheck,
   upload.single("avatar"),
   async (req, res) => {
@@ -52,18 +55,20 @@ router.post(
       }
       const avatarPath = "/uploads/avatars/" + req.file.filename;
 
-      // User modelda avatar maydonini yangilash
-      const user = await User.findByIdAndUpdate(
-        req.params.id,
-        { avatar: avatarPath },
-        { new: true, select: "-password" }
-      );
-
+      const user = await User.findById(req.userId);
       if (!user) {
-        // Yuklangan faylni o'chirish
         fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
       }
+
+      // Agar eski avatar bo'lsa, o'chirish
+      if (user.avatar) {
+        const oldPath = path.join(__dirname, "..", user.avatar);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+
+      user.avatar = avatarPath;
+      await user.save();
 
       res.json({ message: "Avatar yuklandi", avatar: avatarPath });
     } catch (error) {
@@ -73,23 +78,29 @@ router.post(
   }
 );
 
-// GET - avatar olish (yo'lni qaytaradi)
-router.get("/api/users/:id/avatar", async (req, res) => {
+// GET - avatarni olish (faylni yuboradi)
+router.get("/api/users/get/avatar", tokenCheck, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.userId);
     if (!user || !user.avatar) {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
-    res.sendFile(path.join(__dirname, user.avatar));
+
+    const avatarPath = path.join(__dirname, "..", user.avatar);
+    if (!fs.existsSync(avatarPath)) {
+      return res.status(404).json({ message: "Avatar fayli topilmadi" });
+    }
+
+    res.sendFile(avatarPath);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
 
-// PUT - avatar yangilash (POST bilan deyarli bir xil)
+// PUT - avatarni yangilash (POST bilan bir xil amaliyot)
 router.put(
-  "/api/users/:id/avatar",
+  "/api/users/avatar",
   tokenCheck,
   upload.single("avatar"),
   async (req, res) => {
@@ -99,18 +110,18 @@ router.put(
       }
       const avatarPath = "/uploads/avatars/" + req.file.filename;
 
-      // Eski avatarni o'chirish uchun
-      const user = await User.findById(req.params.id);
+      const user = await User.findById(req.userId);
       if (!user) {
         fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
       }
+
+      // Eski avatar faylini o'chirish
       if (user.avatar) {
-        const oldPath = path.join(__dirname, user.avatar);
+        const oldPath = path.join(__dirname, "..", user.avatar);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
 
-      // Yangi avatarni saqlash
       user.avatar = avatarPath;
       await user.save();
 
@@ -122,15 +133,15 @@ router.put(
   }
 );
 
-// DELETE - avatar o'chirish
-router.delete("/api/users/:id/avatar", tokenCheck, async (req, res) => {
+// DELETE - avatarni o'chirish
+router.delete("/api/users/avatar", tokenCheck, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.userId);
     if (!user || !user.avatar) {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
 
-    const avatarPath = path.join(__dirname, user.avatar);
+    const avatarPath = path.join(__dirname, "..", user.avatar);
     if (fs.existsSync(avatarPath)) fs.unlinkSync(avatarPath);
 
     user.avatar = "";
