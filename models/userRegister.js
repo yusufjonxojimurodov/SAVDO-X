@@ -42,5 +42,13 @@ schemaCreateAccount.pre("save", async function (next) {
   next();
 });
 
+schemaCreateAccount.pre("save", function (next) {
+  if (this.birthDate) {
+    this.birthDate.setUTCHours(0, 0, 0, 0);
+  }
+
+  next();
+});
+
 const User = mongoose.model("User", schemaCreateAccount);
 module.exports = User;
