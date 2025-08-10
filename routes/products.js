@@ -203,4 +203,35 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.delete(
+  "/my/:id",
+  tokenCheck,
+  permission(["admin", "seller"]),
+  async (req, res) => {
+    try {
+      const productId = req.params.id;
+      const userId = req.userId;
+
+      const product = await ProductModel.findById(productId);
+
+      if (!product) {
+        return res.status(404).json({ message: "Mahsulot topilmadi" });
+      }
+
+      if (product.createdBy.toString() !== userId.toString()) {
+        return res
+          .status(403)
+          .json({ message: "Sizda bu mahsulotni o‘chirish huquqi yo‘q" });
+      }
+
+      await ProductModel.findByIdAndDelete(productId);
+
+      res.json({ message: "Mahsulot muvaffaqiyatli o‘chirildi" });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
+
 module.exports = router;
