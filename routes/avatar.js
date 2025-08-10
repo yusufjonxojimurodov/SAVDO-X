@@ -1,13 +1,12 @@
 const express = require("express");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const User = require("../models/userRegister");
+const axios = require("axios");
 const jwt = require("jsonwebtoken");
+const User = require("../models/userRegister");
 
 const router = express.Router();
 
 const JWT_TOKEN = process.env.JWT_TOKEN;
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY; // imgbb API kalitini .env ga yoz
 
 // Token tekshiruvchi middleware
 const tokenCheck = (req, res, next) => {
@@ -23,126 +22,63 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// Multer sozlamalari - papka project root ichida "uploads/avatars"
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "..", "uploads", "avatars"));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${req.userId}_${Date.now()}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    const allowed = ["image/png", "image/jpeg", "image/jpg"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Faqat rasm fayllari qabul qilinadi"));
-  },
-});
-
-// POST - avatar yuklash (yangi avatar yaratish)
-router.post(
-  "/api/users/avatar",
-  tokenCheck,
-  upload.single("avatar"),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "Rasm fayli yuborilmadi" });
-      }
-      const avatarPath = "/uploads/avatars/" + req.file.filename;
-
-      const user = await User.findById(req.userId);
-      if (!user) {
-        fs.unlinkSync(req.file.path);
-        return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
-      }
-
-      // Agar eski avatar bo'lsa, o'chirish
-      if (user.avatar) {
-        const oldPath = path.join(__dirname, "..", user.avatar);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-
-      user.avatar = avatarPath;
-      await user.save();
-
-      res.json({ message: "Avatar yuklandi", avatar: avatarPath });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Server xatosi" });
+// POST - avatar yuklash va IMGBB'ga jo'natish
+router.post("/api/users/avatar", tokenCheck, async (req, res) => {
+  try {
+    if (!req.body.image) {
+      return res
+        .status(400)
+        .json({ message: "Rasm fayli base64 formatda yuborilmadi" });
     }
-  }
-);
 
-// GET - avatarni olish (faylni yuboradi)
+    // IMGBB ga yuklash
+    const formData = new URLSearchParams();
+    formData.append("image", req.body.image);
+
+    const imgbbRes = await axios.post(
+      `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+      formData
+    );
+
+    const imageUrl = imgbbRes.data.data.url;
+
+    // MongoDB dagi user avatarini yangilash
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+    }
+
+    user.avatar = imageUrl;
+    await user.save();
+
+    res.json({ message: "Avatar yuklandi", avatar: imageUrl });
+  } catch (error) {
+    console.error(error.response?.data || error.message);
+    res.status(500).json({ message: "Rasm yuklashda xatolik" });
+  }
+});
+
+// GET - avatar URL ni olish
 router.get("/api/users/get/avatar", tokenCheck, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user || !user.avatar) {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
-
-    const avatarPath = path.join(__dirname, "..", user.avatar);
-    if (!fs.existsSync(avatarPath)) {
-      return res.status(404).json({ message: "Avatar fayli topilmadi" });
-    }
-
-    res.sendFile(avatarPath);
+    res.json({ avatar: user.avatar });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
 
-// PUT - avatarni yangilash (POST bilan bir xil amaliyot)
-router.put(
-  "/api/users/avatar",
-  tokenCheck,
-  upload.single("avatar"),
-  async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "Rasm fayli yuborilmadi" });
-      }
-      const avatarPath = "/uploads/avatars/" + req.file.filename;
-
-      const user = await User.findById(req.userId);
-      if (!user) {
-        fs.unlinkSync(req.file.path);
-        return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
-      }
-
-      // Eski avatar faylini o'chirish
-      if (user.avatar) {
-        const oldPath = path.join(__dirname, "..", user.avatar);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-
-      user.avatar = avatarPath;
-      await user.save();
-
-      res.json({ message: "Avatar yangilandi", avatar: avatarPath });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Server xatosi" });
-    }
-  }
-);
-
-// DELETE - avatarni o'chirish
+// DELETE - avatar URL ni o'chirish
 router.delete("/api/users/avatar", tokenCheck, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user || !user.avatar) {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
-
-    const avatarPath = path.join(__dirname, "..", user.avatar);
-    if (fs.existsSync(avatarPath)) fs.unlinkSync(avatarPath);
 
     user.avatar = "";
     await user.save();
