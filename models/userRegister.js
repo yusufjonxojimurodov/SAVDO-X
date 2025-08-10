@@ -21,6 +21,10 @@ const schemaCreateAccount = new mongoose.Schema({
     type: String,
     default: "",
   },
+  email: {
+    type: String,
+    default: "",
+  },
   role: {
     type: String,
     enum: ["admin", "seller", "customer", "blocked"],

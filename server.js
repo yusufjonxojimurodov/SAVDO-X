@@ -149,35 +149,32 @@ users.put("/api/update-role/:id", tokenCheck, async (req, res) => {
   }
 });
 
-users.put(
-  "/api/update-profile",
-  tokenCheck,
-  async (req, res) => {
-    try {
-      const { name, surname, phone } = req.body;
-      const updateData = {};
+users.put("/api/update-profile", tokenCheck, async (req, res) => {
+  try {
+    const { name, surname, phone, email } = req.body;
+    const updateData = {};
 
-      if (name) updateData.name = name;
-      if (surname) updateData.surname = surname;
-      if (phone) updateData.phone = phone;
-  
-      const updatedUser = await User.findByIdAndUpdate(
-        req.userId,
-        { $set: updateData },
-        { new: true, select: "-password" }
-      );
+    if (name) updateData.name = name;
+    if (surname) updateData.surname = surname;
+    if (phone) updateData.phone = phone;
+    if (email) updateData.email = email;
 
-      if (!updatedUser) {
-        return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
-      }
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: updateData },
+      { new: true, select: "-password" }
+    );
 
-      res.json({ message: "Profil yangilandi", user: updatedUser });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Server xatosi" });
+    if (!updatedUser) {
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
     }
+
+    res.json({ message: "Profil yangilandi", user: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server xatosi" });
   }
-);
+});
 
 const PORT = process.env.PORT || 5000;
 users.listen(PORT, "0.0.0.0", () =>
