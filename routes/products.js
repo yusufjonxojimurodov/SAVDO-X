@@ -235,7 +235,7 @@ router.delete(
 );
 
 router.put(
-  "/my/:id",
+  "/my/product/edit/:id",
   tokenCheck,
   permission(["admin", "seller"]),
   upload.single("image"),
