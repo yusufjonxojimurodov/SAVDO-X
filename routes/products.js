@@ -234,4 +234,83 @@ router.delete(
   }
 );
 
+router.put(
+  "/my/:id",
+  tokenCheck,
+  permission(["admin", "seller"]),
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { name, description, price, left, model } = req.body;
+      const productId = req.params.id;
+      const userId = req.userId;
+
+      let product = await ProductModel.findById(productId);
+
+      if (!product) {
+        return res.status(404).json({ message: "Mahsulot topilmadi" });
+      }
+
+      if (product.createdBy.toString() !== userId.toString()) {
+        return res
+          .status(403)
+          .json({ message: "Sizda bu mahsulotni tahrirlash huquqi yo‘q" });
+      }
+
+      let imageUrl = product.image; // agar rasm o'zgarmasa eski link qoladi
+
+      if (req.file) {
+        const inputPath = req.file.path;
+        const outputPath = `uploads/${Date.now()}-no-bg.png`;
+
+        const result = await removeBackgroundFromImageFile({
+          path: inputPath,
+          apiKey: process.env.REMOVE_BG_API_KEY,
+          size: "auto",
+          type: "auto",
+        });
+
+        await sharp(Buffer.from(result.base64img, "base64"))
+          .png()
+          .toFile(outputPath);
+
+        const imageBuffer = fs.readFileSync(outputPath);
+        const imageBase64 = imageBuffer.toString("base64");
+
+        const formData = new FormData();
+        formData.append("image", imageBase64);
+
+        const response = await axios.post(
+          `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+          formData,
+          { headers: formData.getHeaders() }
+        );
+
+        fs.unlinkSync(inputPath);
+        imageUrl = response.data.data.url;
+      }
+
+      // yangilash
+      product.name = name ?? product.name;
+      product.description = description ?? product.description;
+      product.price = price ?? product.price;
+      product.left = left ?? product.left;
+      product.model = model ?? product.model;
+      product.image = imageUrl;
+
+      await product.save();
+
+      const updatedProduct = await ProductModel.findById(productId).populate(
+        "createdBy",
+        "userName"
+      );
+
+      res.json(updatedProduct);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
+
 module.exports = router;
