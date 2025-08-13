@@ -9,6 +9,7 @@ const productsRouter = require("./routes/products.js");
 const basketRouter = require("./routes/basketProduct.js");
 const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
+const pendingRoutes = require("./routes/pending.products.rout.js");
 
 require("dotenv").config();
 
@@ -20,6 +21,7 @@ users.use("/get/all/products", productsRouter);
 users.use("/basket", basketRouter);
 users.use("/api/comments", commentRouter);
 users.use(avatarRouter);
+users.use("/pending/products", pendingRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI, {

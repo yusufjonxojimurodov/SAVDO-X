@@ -10,6 +10,7 @@ const sharp = require("sharp");
 const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
 const { removeBackgroundFromImageFile } = require("remove.bg");
+const PendingProduct = require("../models/pending.products.js");
 
 const upload = multer({ dest: "temp/" });
 
