@@ -151,13 +151,14 @@ users.put("/api/update-role/:id", tokenCheck, async (req, res) => {
 
 users.put("/api/update-profile", tokenCheck, async (req, res) => {
   try {
-    const { name, surname, phone, email, birthDate } = req.body;
+    const { name, surname, phone, email, userName, birthDate } = req.body;
     const updateData = {};
 
     if (name) updateData.name = name;
     if (surname) updateData.surname = surname;
     if (phone) updateData.phone = phone;
     if (email) updateData.email = email;
+    if (userName) updateData.userName = userName;
     if (birthDate) updateData.birthDate = birthDate;
 
     const updatedUser = await User.findByIdAndUpdate(
