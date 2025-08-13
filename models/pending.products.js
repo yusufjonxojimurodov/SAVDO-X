@@ -6,27 +6,21 @@ const pendingProductSchema = new mongoose.Schema({
     ref: "Product",
     required: true,
   },
-  name: { type: String, required: true },
-  description: { type: String },
-  price: { type: Number, required: true },
-  model: { type: String },
-  left: { type: Number },
-  image: { type: String },
+  name: String,
+  description: String,
+  price: Number,
+  model: String,
+  left: Number,
+  image: String,
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
   },
-  quantity: { type: Number, required: true },
-  buyer: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
+  quantity: Number,
+  buyer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  phone: String,
+  createdAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model("PendingProduct", pendingProductSchema);

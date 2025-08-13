@@ -17,40 +17,49 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// POST endpoint: buyurtmani PendingProducts ga qo'shish
 router.post("/add", tokenCheck, async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
+    const { orders, phone } = req.body;
 
-    // BasketProduct DBda shu user va productni topish
-    const basketItem = await BasketProduct.findOne({
-      user: req.userId,
-      product: productId,
-    }).populate("product");
-
-    if (!basketItem) {
-      return res.status(404).json({ message: "Mahsulot savatchada topilmadi" });
+    if (!orders || !Array.isArray(orders) || orders.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Orders array bo'sh bo'lmasligi kerak" });
     }
 
-    // PendingProduct DBga saqlash
-    const pending = new PendingProduct({
-      product: basketItem.product._id,
-      name: basketItem.product.name,
-      description: basketItem.product.description,
-      price: basketItem.product.price,
-      model: basketItem.product.model,
-      left: basketItem.product.left,
-      image: basketItem.product.image,
-      createdBy: basketItem.product.createdBy,
-      quantity: quantity,
-      buyer: req.userId, // kim buyurtma qildi
-    });
+    const pendingProducts = [];
 
-    await pending.save();
+    for (const order of orders) {
+      const { productId, quantity } = order;
+
+      const basketItem = await BasketProduct.findOne({
+        user: req.userId,
+        product: productId,
+      }).populate("product");
+
+      if (!basketItem) continue; // savatchada bo'lmasa o'tkazib yuboradi
+
+      const pending = new PendingProduct({
+        product: basketItem.product._id,
+        name: basketItem.product.name,
+        description: basketItem.product.description,
+        price: basketItem.product.price,
+        model: basketItem.product.model,
+        left: basketItem.product.left,
+        image: basketItem.product.image,
+        createdBy: basketItem.product.createdBy,
+        quantity,
+        buyer: req.userId,
+        phone, // foydalanuvchi telefon raqami
+      });
+
+      await pending.save();
+      pendingProducts.push(pending);
+    }
 
     res.status(201).json({
-      message: "Mahsulot tasdiqlanishi kutilayotganlarga qo‘shildi",
-      pending,
+      message: "Mahsulotlar tasdiqlanishi kutilayotganlarga qo‘shildi",
+      pendingProducts,
     });
   } catch (err) {
     console.error(err);
