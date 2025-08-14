@@ -87,19 +87,29 @@ module.exports = (app) => {
   bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const userName = msg.from.username;
+
     console.log("Telegram username:", userName, "chatId:", chatId);
-    if (!userName) return;
+
+    if (!userName) {
+      bot.sendMessage(
+        chatId,
+        "Sizning username topilmadi. Telegram username kerak!"
+      );
+      return;
+    }
 
     try {
-      let user = await User.findOne({ userName });
+      const user = await User.findOne({ userName });
+
       if (user) {
         user.chatId = chatId;
-        await user.save();
+        await user.save(); // pre("save") ishlaydi
+        console.log("ChatId saqlandi:", user.chatId);
+        bot.sendMessage(chatId, "Botga start muvaffaqiyatli yuborildi ✅");
       } else {
-        // yangi foydalanuvchi yaratib qo‘ymaymiz, lekin info xabar
         bot.sendMessage(
           chatId,
-          "Ro'yxatdan o'tish uchun saytga o'ting va formani to'ldiring."
+          "Siz hali ro'yxatdan o'tmagansiz. Saytdan ro'yxatdan o'ting."
         );
       }
     } catch (err) {
