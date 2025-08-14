@@ -193,7 +193,3 @@ bot.on("message", (msg) => {
   // boshqa menyular logikasi shu yerda qoladi
   // ...
 });
-
-app.listen(PORT, () => {
-  console.log(`Server ${PORT} portda ishlayapti ✅`);
-});
