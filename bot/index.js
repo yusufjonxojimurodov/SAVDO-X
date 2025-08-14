@@ -154,16 +154,23 @@ function sendAdminMenu(chatId) {
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const userName = msg.from.first_name || "Foydalanuvchi";
-  const username = msg.from.username || "username yo‘q";
+  const userName = msg.from.username || "username yo‘q";
+  const firstName = msg.from.first_name || "Foydalanuvchi";
 
-  usersInfo[chatId] = { username, first_name: userName };
+  usersInfo[chatId] = { username: userName, first_name: firstName };
 
   try {
-    const user = await User.findOne({ userName: username });
+    const user = await User.findOne({ userName });
     if (user) {
+      // Bu yerda chatId saqlanadi
       user.chatId = chatId;
-      await user.save();
+      await user.save(); // mongo db update qilinadi
+    } else {
+      // Agar user hali ro'yxatdan o'tmagan bo'lsa, xabar berish yoki yaratish mumkin
+      bot.sendMessage(
+        chatId,
+        "Siz hali ro'yxatdan o'tmagansiz. Iltimos /register orqali ro'yxatdan o'ting."
+      );
     }
   } catch (err) {
     console.error("ChatId saqlanmadi:", err.message);
@@ -178,7 +185,7 @@ bot.onText(/\/start/, async (msg) => {
   }
 
   if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
-  else sendMainMenu(chatId, userName);
+  else sendMainMenu(chatId, firstName);
 
   userStates[chatId] = null;
 });
