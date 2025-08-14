@@ -3,61 +3,45 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const path = require("path");
-const dotenv = require("dotenv");
-
 const User = require("./models/userRegister.js");
+const path = require("path");
 const productsRouter = require("./routes/products.js");
 const basketRouter = require("./routes/basketProduct.js");
 const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
-const telegramBot = require("./bot/index.js");
+const bot = require("../bot/index.js");
 
-dotenv.config();
+require("dotenv").config();
 
-const app = express();
+const users = express();
+users.use(cors());
+users.use(express.json());
+users.use("/uploads", express.static(path.join(__dirname, "uploads")));
+users.use("/get/all/products", productsRouter);
+users.use("/basket", basketRouter);
+users.use("/api/comments", commentRouter);
+users.use(avatarRouter);
+users.use("/pending/products", pendingRoutes);
 
-// Middleware
-const corsOptions = {
-  origin: true, // barcha domenlarga ruxsat
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
-
-app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Routes
-app.use("/get/all/products", productsRouter);
-app.use("/basket", basketRouter);
-app.use("/api/comments", commentRouter);
-app.use(avatarRouter);
-app.use("/pending/products", pendingRoutes);
-
-// MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
   .then(() => {
-    console.log("MongoDB Muvaffaqiyatli");
+    console.log("MongoDb Muvaffaqiyatli");
   })
   .catch((errorMongo) => {
-    console.error("MongoDB ulanish xatosi:", errorMongo);
+    console.log(errorMongo);
   });
 
-// JWT token check middleware
 const JWT_TOKEN = process.env.JWT_TOKEN;
 
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token)
     return res.status(401).json({ message: "Foydalanuvchi tokeni topilmadi" });
-
   try {
     const decoded = jwt.verify(token, JWT_TOKEN);
     req.userId = decoded.id;
@@ -67,78 +51,66 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// Auth routes
-app.post("/api/register", async (req, res) => {
+users.post("/api/register", async (request, response) => {
   try {
-    const { name, surname, userName, password } = req.body;
-
+    const { name, surname, userName, password } = request.body;
     const exists = await User.findOne({ userName });
     if (exists)
-      return res
+      return response
         .status(400)
         .json({ message: "Bunday UserName allaqachon mavjud" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = new User({
-      name,
-      surname,
-      userName,
-      password: hashedPassword,
-    });
+    const newUser = new User({ name, surname, userName, password });
     await newUser.save();
-
     const token = jwt.sign({ id: newUser._id }, JWT_TOKEN, {
       expiresIn: "24h",
     });
-
-    res.status(201).json({
+    response.status(201).json({
       message: "Akkaunt Muvaffaqiyatli yaratildi",
       token,
     });
   } catch (error) {
-    console.error(error);
     if (error.name === "ValidationError")
-      return res.status(400).json({ message: "Bad Request" });
-    res.status(500).json({ message: "Server Xatoligi" });
+      return response.status(400).json({ message: "Bad Request" });
+    response.status(500).json({ message: "Server Xatoligi" });
   }
 });
 
-app.post("/api/login", async (req, res) => {
+users.post("/api/login", async (request, response) => {
   try {
-    const { userName, password } = req.body;
+    const { userName, password } = request.body;
     const user = await User.findOne({ userName });
-    if (!user) return res.status(400).json({ message: "User Name Notogri" });
+    if (!user)
+      return response.status(400).json({ message: "User Name Notogri" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(400).json({ message: "UserName yoki Password Xato" });
+      return response
+        .status(400)
+        .json({ message: "UserName yoki Password Xato" });
 
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, { expiresIn: "24h" });
-
-    res.json({
+    response.json({
       token,
       name: user.name,
       surname: user.surname,
       userName: user.userName,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server Xatoligi" });
+    response.status(500).json({ message: "Server Xatoligi" });
   }
 });
 
-app.get("/api/getUserMe", tokenCheck, async (req, res) => {
+users.get("/api/getUserMe", tokenCheck, async (request, response) => {
   try {
-    const user = await User.findById(req.userId).select("-password");
-    res.json(user);
+    const user = await User.findById(request.userId).select("-password");
+    response.json(user);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server Xatoligi" });
+    response.status(500).json({ message: "Server Xatoligi" });
   }
 });
 
-app.put("/api/update-role/:id", tokenCheck, async (req, res) => {
+users.put("/api/update-role/:id", tokenCheck, async (req, res) => {
   try {
     const adminUser = await User.findById(req.userId);
     if (adminUser.role !== "admin") {
@@ -180,7 +152,7 @@ app.put("/api/update-role/:id", tokenCheck, async (req, res) => {
   }
 });
 
-app.put("/api/update-profile", tokenCheck, async (req, res) => {
+users.put("/api/update-profile", tokenCheck, async (req, res) => {
   try {
     const { name, surname, phone, email, userName, birthDate } = req.body;
     const updateData = {};
@@ -209,8 +181,7 @@ app.put("/api/update-profile", tokenCheck, async (req, res) => {
   }
 });
 
-// Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server ${PORT}-portda ishlayapti`);
-});
+users.listen(PORT, "0.0.0.0", () =>
+  console.log(`Server ${PORT}-portda ishlayapti`)
+);
