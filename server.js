@@ -18,8 +18,7 @@ const users = express();
 users.use(
   cors({
     origin: [
-      "https://practicesavdox.netlify.app/", // Netlify frontend
-      "http://localhost:5173", // lokal dev
+      "https://savdo-x.onrender.com", 
     ],
     credentials: true,
   })
