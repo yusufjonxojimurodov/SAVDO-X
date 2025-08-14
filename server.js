@@ -1,5 +1,5 @@
 const express = require("express");
-const router = express.Router();
+const app = express();
 const mongoose = require("mongoose");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
@@ -15,7 +15,7 @@ const bot = require("./bot/index.js");
 
 require("dotenv").config();
 
-router.use(
+app.use(
   cors({
     origin: ["http://localhost:5173", "https://practicesavdox.netlify.app"],
     allowedHeaders: ["Authorization", "Content-Type"],
@@ -23,13 +23,13 @@ router.use(
   })
 );
 
-router.use(express.json());
-router.use("/uploads", express.static(path.join(__dirname, "uploads")));
-router.use("/get/all/products", productsRouter);
-router.use("/basket", basketRouter);
-router.use("/api/comments", commentRouter);
-router.use("/test", avatarRouter);
-router.use("/pending/products", pendingRoutes);
+app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/get/all/products", productsRouter);
+app.use("/basket", basketRouter);
+app.use("/api/comments", commentRouter);
+app.use("/test", avatarRouter);
+app.use("/pending/products", pendingRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -58,7 +58,7 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-router.post("/api/register", async (request, response) => {
+app.post("/api/register", async (request, response) => {
   try {
     const { name, surname, userName, password } = request.body;
     const exists = await User.findOne({ userName });
@@ -83,7 +83,7 @@ router.post("/api/register", async (request, response) => {
   }
 });
 
-router.post("/api/login", async (request, response) => {
+app.post("/api/login", async (request, response) => {
   try {
     const { userName, password } = request.body;
     const user = await User.findOne({ userName });
@@ -108,7 +108,7 @@ router.post("/api/login", async (request, response) => {
   }
 });
 
-router.get("/api/getUserMe", tokenCheck, async (request, response) => {
+app.get("/api/getUserMe", tokenCheck, async (request, response) => {
   try {
     const user = await User.findById(request.userId).select("-password");
     response.json(user);
@@ -117,7 +117,7 @@ router.get("/api/getUserMe", tokenCheck, async (request, response) => {
   }
 });
 
-router.put("/api/update-role/:id", tokenCheck, async (req, res) => {
+app.put("/api/update-role/:id", tokenCheck, async (req, res) => {
   try {
     const adminUser = await User.findById(req.userId);
     if (adminUser.role !== "admin") {
@@ -159,7 +159,7 @@ router.put("/api/update-role/:id", tokenCheck, async (req, res) => {
   }
 });
 
-router.put("/api/update-profile", tokenCheck, async (req, res) => {
+app.put("/api/update-profile", tokenCheck, async (req, res) => {
   try {
     const { name, surname, phone, email, userName, birthDate } = req.body;
     const updateData = {};
@@ -189,6 +189,6 @@ router.put("/api/update-profile", tokenCheck, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-router.listen(PORT, "0.0.0.0", () =>
+app.listen(PORT, "0.0.0.0", () =>
   console.log(`Server ${PORT}-portda ishlayapti`)
 );
