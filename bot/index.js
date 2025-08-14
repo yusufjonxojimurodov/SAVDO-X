@@ -11,7 +11,7 @@ const PendingProduct = require("../models/pending.products");
 const token = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
 const PORT = process.env.PORT || 3000;
-const URL = process.env.URL || "https://your-domain.com";
+const URL = process.env.URL || "https://2fd3fb43a613.ngrok-free.app";
 
 const bot = new TelegramBot(token, { webHook: true });
 bot.setWebHook(`${URL}/bot${token}`);
@@ -110,7 +110,6 @@ bot.on("callback_query", async (callbackQuery) => {
   bot.answerCallbackQuery(callbackQuery.id);
 });
 
-// Quyida /start va menyu logikasi o'zgarmadi
 const userStates = {};
 const adminReplyingTo = {};
 const blockedUsers = {};
