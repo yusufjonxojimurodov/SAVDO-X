@@ -19,14 +19,13 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      callback(null, true); // Hamma domenga ruxsat
-    },
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: true, // barcha domenlarga ruxsat
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
