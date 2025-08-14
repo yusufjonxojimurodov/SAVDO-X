@@ -102,20 +102,24 @@ module.exports = (app) => {
       let user = await User.findOne({ userName });
 
       if (!user) {
-        // Faqat userName va chatId saqlanadi
+        // Faqat userName va chatId saqlanadi, password bo'sh qoladi
         user = new User({ userName, chatId });
         await user.save();
         console.log("Yangi foydalanuvchi yaratildi:", user);
+        bot.sendMessage(chatId, "Botga start muvaffaqiyatli yuborildi ✅");
       } else {
-        // Agar allaqachon bo'lsa, chatId update qilinadi
+        // Agar allaqachon bo'lsa, chatId yangilansin
         user.chatId = chatId;
         await user.save();
         console.log("ChatId yangilandi:", user.chatId);
+        bot.sendMessage(
+          chatId,
+          "Siz allaqachon ro'yxatdan o'tgansiz, chatId yangilandi ✅"
+        );
       }
-
-      bot.sendMessage(chatId, "Botga start muvaffaqiyatli yuborildi ✅");
     } catch (err) {
       console.error("ChatId saqlanmadi:", err.message);
+      bot.sendMessage(chatId, `Xatolik yuz berdi: ${err.message}`);
     }
   });
 
