@@ -23,7 +23,8 @@ app.use(
   cors({
 origin: [
   "https://savdo-x.onrender.com",
-  "http://localhost:5173",
+  "http://192.168.0.196:5173",
+  "http://192.168.0.196:10000",
   
 ]
   })
