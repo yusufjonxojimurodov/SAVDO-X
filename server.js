@@ -13,6 +13,7 @@ const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
 
 require("dotenv").config();
+require("./bot/index.js")(app);
 
 app.use(
   cors({
