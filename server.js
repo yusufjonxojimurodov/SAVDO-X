@@ -58,52 +58,44 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-app.post("/api/register", async (request, response) => {
+app.post("/api/register", async (req, res) => {
   try {
-    const { name, surname, userName, password } = request.body;
+    const { name, surname, userName, password } = req.body;
 
-    // 1️⃣ UserName allaqachon mavjudligini tekshirish
+    // 1️⃣ UserName mavjudligini tekshirish
     const exists = await User.findOne({ userName });
     if (exists)
-      return response
-        .status(400)
-        .json({ message: "Bunday UserName allaqachon mavjud" });
+      return res.status(400).json({ message: "Bunday UserName mavjud" });
 
-    // 2️⃣ Telegram chatId mavjudligini tekshirish
+    // 2️⃣ Telegram botga /start bosilganligini tekshirish
     const userWithChat = await User.findOne({
       userName,
       chatId: { $ne: null },
     });
     if (!userWithChat) {
-      return response.status(400).json({
+      return res.status(400).json({
         message: "Iltimos, ro‘yxatdan o‘tish uchun avval botga /start yuboring",
       });
     }
 
-    // 3️⃣ Yangi foydalanuvchini yaratish va chatId ni saqlash
-    const newUser = new User({
-      name,
-      surname,
-      userName,
-      password,
-      chatId: userWithChat.chatId,
-    });
-
-    await newUser.save();
+    // 3️⃣ Foydalanuvchini yaratish va chatId ni saqlash
+    userWithChat.name = name;
+    userWithChat.surname = surname;
+    userWithChat.password = password; // bcrypt pre-save ishlaydi
+    await userWithChat.save();
 
     // 4️⃣ JWT token yaratish
-    const token = jwt.sign({ id: newUser._id }, JWT_TOKEN, {
+    const token = jwt.sign({ id: userWithChat._id }, JWT_TOKEN, {
       expiresIn: "24h",
     });
 
-    response.status(201).json({
+    res.status(201).json({
       message: "Akkaunt Muvaffaqiyatli yaratildi",
       token,
     });
   } catch (error) {
-    if (error.name === "ValidationError")
-      return response.status(400).json({ message: "Bad Request" });
-    response.status(500).json({ message: "Server Xatoligi" });
+    console.error(error);
+    res.status(500).json({ message: "Server Xatoligi" });
   }
 });
 
