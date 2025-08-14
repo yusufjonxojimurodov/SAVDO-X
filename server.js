@@ -21,7 +21,7 @@ users.use("/uploads", express.static(path.join(__dirname, "uploads")));
 users.use("/get/all/products", productsRouter);
 users.use("/basket", basketRouter);
 users.use("/api/comments", commentRouter);
-users.use(avatarRouter);
+users.use("test", avatarRouter);
 users.use("/pending/products", pendingRoutes);
 
 mongoose
