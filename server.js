@@ -15,13 +15,20 @@ const bot = require("./bot/index.js");
 require("dotenv").config();
 
 const users = express();
-users.use(cors());
+users.use(
+  cors({
+    origin: ["http://localhost:5173", "https://practicesavdox.netlify.app/"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+    credentials: true,
+  })
+);
+
 users.use(express.json());
 users.use("/uploads", express.static(path.join(__dirname, "uploads")));
 users.use("/get/all/products", productsRouter);
 users.use("/basket", basketRouter);
 users.use("/api/comments", commentRouter);
-users.use("test", avatarRouter);
+users.use("/test", avatarRouter);
 users.use("/pending/products", pendingRoutes);
 
 mongoose
