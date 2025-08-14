@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const BasketProduct = require("../models/basketProduct.js");
 const PendingProduct = require("../models/pending.products.js");
 const ProductModel = require("../models/products.js");
+const axios = require("axios");
 
 const tokenCheck = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -32,12 +33,13 @@ router.post("/add", tokenCheck, async (req, res) => {
     for (const order of orders) {
       const { productId, quantity } = order;
 
-      const basketItem = await BasketProduct.findOne({
-        user: req.userId,
-        product: productId,
-      }).populate("product");
+      const basketItem = await BasketProduct.findById(productId).populate(
+        "product"
+      );
 
-      if (!basketItem) continue; // savatchada bo'lmasa o'tkazib yuboradi
+      if (!basketItem) {
+        return res.status(404).json({ message: "Bunday mahsulot topilmadi" });
+      }
 
       const pending = new PendingProduct({
         product: basketItem.product._id,
@@ -48,13 +50,24 @@ router.post("/add", tokenCheck, async (req, res) => {
         left: basketItem.product.left,
         image: basketItem.product.image,
         createdBy: basketItem.product.createdBy,
-        quantity,
+        quantity: quantity || basketItem.quantity,
         buyer: req.userId,
-        phone, // foydalanuvchi telefon raqami
+        phone,
       });
 
       await pending.save();
       pendingProducts.push(pending);
+
+      try {
+        await axios.post("http://localhost:5000/new-order", {
+          sellerChatId: pending.createdBy.chatId,
+          buyerName: req.userId,
+          productName: basketItem.product.name,
+          quantity: quantity || basketItem.quantity,
+        });
+      } catch (err) {
+        console.error("Botga xabar yuborilmadi:", err.message);
+      }
     }
 
     res.status(201).json({
@@ -67,14 +80,49 @@ router.post("/add", tokenCheck, async (req, res) => {
   }
 });
 
-// GET endpoint: faqat seller o‘zining pending productslarini ko‘rsin
-router.get("/my-pending", tokenCheck, async (req, res) => {
+router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
   try {
     const pendingOrders = await PendingProduct.find({
-      createdBy: req.userId,
-    }).populate("buyer", "name userName");
+      buyer: req.userId,
+    })
+      .populate("product")
+      .populate("createdBy", "name userName");
 
     res.json(pendingOrders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+// GET /my-pending/seller
+router.get("/my-pending/seller", tokenCheck, async (req, res) => {
+  try {
+    const pendingOrders = await PendingProduct.find({
+      createdBy: req.userId, // faqat o'z yaratgan mahsulotlari
+    })
+      .populate("buyer", "name userName")
+      .populate("product"); // buyer va product ma'lumotlari
+
+    res.json(pendingOrders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+// DELETE /pending/delete/:id
+router.delete("/delete/:id", tokenCheck, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deleted = await PendingProduct.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "PendingProduct topilmadi" });
+    }
+
+    res.json({ message: "PendingProduct muvaffaqiyatli o‘chirildi", deleted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });
