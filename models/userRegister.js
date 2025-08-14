@@ -11,7 +11,7 @@ const schemaCreateAccount = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, "Parol kiritilishi shart"],
+    required: [false, "Parol kiritilishi shart"],
   },
   phone: {
     type: String,
