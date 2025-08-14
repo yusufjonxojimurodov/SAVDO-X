@@ -60,34 +60,30 @@ const tokenCheck = (req, res, next) => {
 
 app.post("/api/register", async (req, res) => {
   const { name, surname, userName, password } = req.body;
-  try {
-    // 1️⃣ UserName allaqachon mavjudligini tekshirish
-    const exists = await User.findOne({ userName });
-    if (exists)
-      return res.status(400).json({ message: "Bunday UserName mavjud" });
 
-    // 2️⃣ Botga start bosilganini tekshirish
-    const userWithChat = await User.findOne({
-      userName,
-      chatId: { $ne: null },
-    });
-    if (!userWithChat)
+  try {
+    // 1️⃣ Bot orqali start bosilganligini tekshirish
+    const user = await User.findOne({ userName, chatId: { $ne: null } });
+    if (!user)
       return res.status(400).json({
         message: "Iltimos, avval botga /start bosing",
       });
 
-    // 3️⃣ Foydalanuvchi ma'lumotlarini yangilash
-    userWithChat.name = name;
-    userWithChat.surname = surname;
-    userWithChat.password = password; // bcrypt pre-save ishlaydi
-    await userWithChat.save();
+    // 2️⃣ Foydalanuvchi ma'lumotlarini yangilash
+    user.name = name;
+    user.surname = surname;
+    user.password = password; // pre-save hook ishlaydi
+    await user.save();
 
-    // 4️⃣ JWT token yaratish
-    const token = jwt.sign({ id: userWithChat._id }, JWT_TOKEN, {
+    // 3️⃣ JWT token yaratish
+    const token = jwt.sign({ id: user._id }, JWT_TOKEN, {
       expiresIn: "24h",
     });
 
-    res.status(201).json({ message: "Akkaunt yaratildi", token });
+    res.status(201).json({
+      message: "Akkaunt yaratildi",
+      token,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });

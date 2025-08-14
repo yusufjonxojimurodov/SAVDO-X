@@ -99,19 +99,21 @@ module.exports = (app) => {
     }
 
     try {
-      const user = await User.findOne({ userName });
+      let user = await User.findOne({ userName });
 
-      if (user) {
-        user.chatId = chatId;
-        await user.save(); // pre("save") ishlaydi
-        console.log("ChatId saqlandi:", user.chatId);
-        bot.sendMessage(chatId, "Botga start muvaffaqiyatli yuborildi ✅");
+      if (!user) {
+        // Faqat userName va chatId saqlanadi
+        user = new User({ userName, chatId });
+        await user.save();
+        console.log("Yangi foydalanuvchi yaratildi:", user);
       } else {
-        bot.sendMessage(
-          chatId,
-          "Siz hali ro'yxatdan o'tmagansiz. Saytdan ro'yxatdan o'ting."
-        );
+        // Agar allaqachon bo'lsa, chatId update qilinadi
+        user.chatId = chatId;
+        await user.save();
+        console.log("ChatId yangilandi:", user.chatId);
       }
+
+      bot.sendMessage(chatId, "Botga start muvaffaqiyatli yuborildi ✅");
     } catch (err) {
       console.error("ChatId saqlanmadi:", err.message);
     }
