@@ -10,12 +10,20 @@ const basketRouter = require("./routes/basketProduct.js");
 const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
-const telegramBot = require("./bot/index.js")
+const telegramBot = require("./bot/index.js");
 
 require("dotenv").config();
 
 const users = express();
-users.use(cors());
+users.use(
+  cors({
+    origin: [
+      "https://practicesavdox.netlify.app/", // Netlify frontend
+      "http://localhost:5173", // lokal dev
+    ],
+    credentials: true,
+  })
+);
 users.use(express.json());
 users.use("/uploads", express.static(path.join(__dirname, "uploads")));
 users.use("/get/all/products", productsRouter);
