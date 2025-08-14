@@ -1,19 +1,44 @@
 const TelegramBot = require("node-telegram-bot-api");
 const User = require("../models/userRegister.js");
 const Product = require("../models/products.js");
+const bodyParser = require("body-parser");
 
 module.exports = (app) => {
   const token = process.env.BOT_TOKEN;
   const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
   const URL = process.env.URL;
 
+  if (!token) {
+    console.error("BOT_TOKEN topilmadi! Iltimos .env faylga qo'shing.");
+    return;
+  }
+  if (!URL) {
+    console.error("URL topilmadi! Iltimos .env faylga qo'shing.");
+    return;
+  }
+
   const bot = new TelegramBot(token, { webHook: true });
   bot.setWebHook(`${URL}/bot${token}`);
 
-  // Telegram webhook endpoint
+  // Telegram webhook uchun raw body
+  app.use(
+    `/bot${token}`,
+    bodyParser.json({
+      verify: (req, res, buf) => {
+        req.rawBody = buf.toString();
+      },
+    })
+  );
+
   app.post(`/bot${token}`, (req, res) => {
-    bot.processUpdate(req.body);
-    res.sendStatus(200);
+    try {
+      const update = JSON.parse(req.rawBody);
+      bot.processUpdate(update);
+      res.sendStatus(200);
+    } catch (err) {
+      console.error("Telegram update xato:", err);
+      res.sendStatus(500);
+    }
   });
 
   const userStates = {};
@@ -36,25 +61,27 @@ module.exports = (app) => {
         one_time_keyboard: true,
       },
     };
-    bot.sendMessage(chatId, text, options);
+    bot.sendMessage(chatId, text, options).catch(console.error);
   }
 
   function sendAdminMenu(chatId) {
     const text = "Xush kelibsiz, Admin! Quyidagi menyudan tanlang:";
-    bot.sendMessage(chatId, text, {
-      reply_markup: {
-        keyboard: [
-          ["Adminga bog‘lanish📲"],
-          ["Mahsulot egasidan Shikoyat⚠️"],
-          ["Saytdagi Muammolar🐞"],
-          ["Saytimizga takliflar📃"],
-          ["Savdo X saytida mahsulot sotish🛒"],
-          ["Foydalanuvchilar ro'yxati"],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
+    bot
+      .sendMessage(chatId, text, {
+        reply_markup: {
+          keyboard: [
+            ["Adminga bog‘lanish📲"],
+            ["Mahsulot egasidan Shikoyat⚠️"],
+            ["Saytdagi Muammolar🐞"],
+            ["Saytimizga takliflar📃"],
+            ["Savdo X saytida mahsulot sotish🛒"],
+            ["Foydalanuvchilar ro'yxati"],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      })
+      .catch(console.error);
   }
 
   bot.onText(/\/start/, async (msg) => {
@@ -70,20 +97,24 @@ module.exports = (app) => {
         user.chatId = chatId;
         await user.save();
       } else {
-        bot.sendMessage(
-          chatId,
-          "Siz hali ro'yxatdan o'tmagansiz. /register orqali ro'yxatdan o'ting."
-        );
+        bot
+          .sendMessage(
+            chatId,
+            "Siz hali ro'yxatdan o'tmagansiz. /register orqali ro'yxatdan o'ting."
+          )
+          .catch(console.error);
       }
     } catch (err) {
       console.error("ChatId saqlanmadi:", err.message);
     }
 
     if (blockedUsers[chatId]) {
-      bot.sendMessage(
-        chatId,
-        "Siz blocklangansiz ❌. Faqat /start buyrug‘ini yuborishingiz mumkin."
-      );
+      bot
+        .sendMessage(
+          chatId,
+          "Siz blocklangansiz ❌. Faqat /start buyrug‘ini yuborishingiz mumkin."
+        )
+        .catch(console.error);
       return;
     }
 
@@ -94,9 +125,15 @@ module.exports = (app) => {
   });
 
   bot.on("message", (msg) => {
+    if (!msg || !msg.chat || !msg.text) return;
     const chatId = msg.chat.id;
     const text = msg.text;
+
     if (blockedUsers[chatId] || !text) return;
-    // boshqa menyular logikasi shu yerda qoladi
+
+    // Boshqa menyu logikasi shu yerda qoladi
+    // Masalan: "Adminga bog‘lanish📲" ni qayta ishlash
   });
+
+  console.log("Telegram bot webhook sozlandi ✅");
 };
