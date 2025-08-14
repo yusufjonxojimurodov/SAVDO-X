@@ -61,17 +61,41 @@ const tokenCheck = (req, res, next) => {
 app.post("/api/register", async (request, response) => {
   try {
     const { name, surname, userName, password } = request.body;
+
+    // 1️⃣ UserName allaqachon mavjudligini tekshirish
     const exists = await User.findOne({ userName });
     if (exists)
       return response
         .status(400)
         .json({ message: "Bunday UserName allaqachon mavjud" });
 
-    const newUser = new User({ name, surname, userName, password });
+    // 2️⃣ Telegram chatId mavjudligini tekshirish
+    const userWithChat = await User.findOne({
+      userName,
+      chatId: { $ne: null },
+    });
+    if (!userWithChat) {
+      return response.status(400).json({
+        message: "Iltimos, ro‘yxatdan o‘tish uchun avval botga /start yuboring",
+      });
+    }
+
+    // 3️⃣ Yangi foydalanuvchini yaratish va chatId ni saqlash
+    const newUser = new User({
+      name,
+      surname,
+      userName,
+      password,
+      chatId: userWithChat.chatId,
+    });
+
     await newUser.save();
+
+    // 4️⃣ JWT token yaratish
     const token = jwt.sign({ id: newUser._id }, JWT_TOKEN, {
       expiresIn: "24h",
     });
+
     response.status(201).json({
       message: "Akkaunt Muvaffaqiyatli yaratildi",
       token,
