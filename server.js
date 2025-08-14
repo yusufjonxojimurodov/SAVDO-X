@@ -21,13 +21,10 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: [
-      "https://savdo-x.onrender.com",
-      "http://localhost:5173",       // 🔹 qo‘shildi
-      "http://192.168.0.196:5173",
-      "http://192.168.0.196:10000"
-    ],
-    credentials: true // Agar cookie yoki auth header ishlatsa
+    origin: (origin, callback) => {
+      callback(null, true); // Hamma domenga ruxsat
+    },
+    credentials: true,
   })
 );
 
