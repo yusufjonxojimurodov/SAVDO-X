@@ -86,42 +86,24 @@ module.exports = (app) => {
 
   bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
-    const userName = msg.from.username || "username yo‘q";
-    const firstName = msg.from.first_name || "Foydalanuvchi";
-
-    usersInfo[chatId] = { username: userName, first_name: firstName };
+    const userName = msg.from.username;
+    if (!userName) return;
 
     try {
-      const user = await User.findOne({ userName });
+      let user = await User.findOne({ userName });
       if (user) {
         user.chatId = chatId;
         await user.save();
       } else {
-        bot
-          .sendMessage(
-            chatId,
-            "Siz hali ro'yxatdan o'tmagansiz. /register orqali ro'yxatdan o'ting."
-          )
-          .catch(console.error);
+        // yangi foydalanuvchi yaratib qo‘ymaymiz, lekin info xabar
+        bot.sendMessage(
+          chatId,
+          "Ro'yxatdan o'tish uchun saytga o'ting va formani to'ldiring."
+        );
       }
     } catch (err) {
       console.error("ChatId saqlanmadi:", err.message);
     }
-
-    if (blockedUsers[chatId]) {
-      bot
-        .sendMessage(
-          chatId,
-          "Siz blocklangansiz ❌. Faqat /start buyrug‘ini yuborishingiz mumkin."
-        )
-        .catch(console.error);
-      return;
-    }
-
-    if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
-    else sendMainMenu(chatId, firstName);
-
-    userStates[chatId] = null;
   });
 
   bot.on("message", (msg) => {

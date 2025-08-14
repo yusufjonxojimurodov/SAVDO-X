@@ -59,26 +59,24 @@ const tokenCheck = (req, res, next) => {
 };
 
 app.post("/api/register", async (req, res) => {
+  const { name, surname, userName, password } = req.body;
   try {
-    const { name, surname, userName, password } = req.body;
-
-    // 1️⃣ UserName mavjudligini tekshirish
+    // 1️⃣ UserName allaqachon mavjudligini tekshirish
     const exists = await User.findOne({ userName });
     if (exists)
       return res.status(400).json({ message: "Bunday UserName mavjud" });
 
-    // 2️⃣ Telegram botga /start bosilganligini tekshirish
+    // 2️⃣ Botga start bosilganini tekshirish
     const userWithChat = await User.findOne({
       userName,
       chatId: { $ne: null },
     });
-    if (!userWithChat) {
+    if (!userWithChat)
       return res.status(400).json({
-        message: "Iltimos, ro‘yxatdan o‘tish uchun avval botga /start yuboring",
+        message: "Iltimos, avval botga /start bosing",
       });
-    }
 
-    // 3️⃣ Foydalanuvchini yaratish va chatId ni saqlash
+    // 3️⃣ Foydalanuvchi ma'lumotlarini yangilash
     userWithChat.name = name;
     userWithChat.surname = surname;
     userWithChat.password = password; // bcrypt pre-save ishlaydi
@@ -89,13 +87,10 @@ app.post("/api/register", async (req, res) => {
       expiresIn: "24h",
     });
 
-    res.status(201).json({
-      message: "Akkaunt Muvaffaqiyatli yaratildi",
-      token,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server Xatoligi" });
+    res.status(201).json({ message: "Akkaunt yaratildi", token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
   }
 });
 
