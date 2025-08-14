@@ -21,7 +21,7 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: "*",
+    origin: "https://savdo-x.onrender.com",
   })
 );
 app.use(express.json());
