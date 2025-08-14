@@ -21,7 +21,11 @@ const app = express();
 // Middleware
 app.use(
   cors({
-    origin: "https://savdo-x.onrender.com",
+origin: [
+  "https://savdo-x.onrender.com",
+  "http://localhost:5173",
+  
+]
   })
 );
 app.use(express.json());
