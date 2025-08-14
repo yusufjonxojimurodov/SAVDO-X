@@ -11,7 +11,6 @@ const basketRouter = require("./routes/basketProduct.js");
 const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
-const bot = require("./bot/index.js");
 
 require("dotenv").config();
 
