@@ -87,6 +87,7 @@ module.exports = (app) => {
   bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const userName = msg.from.username;
+    console.log("Telegram username:", userName, "chatId:", chatId);
     if (!userName) return;
 
     try {
