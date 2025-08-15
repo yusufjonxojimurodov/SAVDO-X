@@ -14,7 +14,6 @@ if (!ADMIN_CHAT_ID) console.error("ADMIN_CHAT_ID topilmadi yoki noto'g'ri!");
 const bot = new TelegramBot(token, { webHook: true });
 bot.setWebHook(`${URL}/bot${token}`);
 
-// ===== Webhook middleware =====
 function setupWebhook(app) {
   app.use(
     `/bot${token}`,
@@ -37,31 +36,10 @@ function setupWebhook(app) {
   });
 }
 
-// ====== State storages ======
-/**
- * userStates — foydalanuvchilar uchun turli holatlar:
- *   - waitingCancelReason      (sotuvchi -> bekor qilish sababi)
- *   - contactAdmin             (user -> adminga bog'lanish, xabar yozishi)
- *   - complaint_step1/2/3     (user -> shikoyat wizard)
- */
 const userStates = {};
-
-/**
- * adminStates — admin uchun holatlar:
- *   - waitingAdminReply {requestId}
- *   - selectedUser {targetChatId, targetUsername}
- *   - waitingDirectMessage {targetChatId, targetUsername}
- */
 const adminStates = {};
-
-/**
- * pendingMap — admin tasdiqlash/bekor qilish uchun yuborilgan user so'rovlari
- *  requestId => { type, userChatId, username, payload }
- *   type: 'contact_admin' | 'complaint' | 'issue' | 'suggestion'
- */
 const pendingMap = {};
-
-// ====== UI helpers ======
+const sellerAddressMap = {};
 const USER_MENU = {
   keyboard: [
     ["Adminga bog‘lanish📲"],
@@ -116,7 +94,6 @@ function genRequestId() {
   return `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 }
 
-// ===== START (/start) =====
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username;
@@ -132,9 +109,7 @@ bot.onText(/\/start/, async (msg) => {
   try {
     let user = await User.findOne({ userName: username });
 
-    // Agar foydalanuvchi DBda bor va phone saqlangan bo'lsa: menyularni ko'rsatamiz, telefon so'ramaymiz
     if (user && user.phone) {
-      // chatId ni har ehtimol yangilab qo'yamiz
       if (user.chatId !== chatId) {
         user.chatId = chatId;
         await user.save();
@@ -144,7 +119,6 @@ bot.onText(/\/start/, async (msg) => {
       return;
     }
 
-    // Bo'lmasa yoki phone yo'q bo'lsa — telefonni so'raymiz
     bot.sendMessage(chatId, "Iltimos, telefon raqamingizni yuboring:", {
       reply_markup: {
         keyboard: [
@@ -160,7 +134,6 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// ===== Contact kelganda saqlash =====
 bot.on("contact", async (msg) => {
   const chatId = msg.chat.id;
   const phone = msg.contact?.phone_number;
@@ -190,7 +163,6 @@ bot.on("contact", async (msg) => {
       bot.sendMessage(chatId, "Telefon raqamingiz yangilandi ✅");
     }
 
-    // Telefon saqlangach menyu ko'rsatamiz
     if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
     else sendMainMenu(chatId, username);
   } catch (err) {
@@ -199,7 +171,6 @@ bot.on("contact", async (msg) => {
   }
 });
 
-// ======= Inline helpers (admin tasdiqlash/bekor qilish) =======
 function sendToAdminWithApproveReject({ type, userChatId, username, payload }) {
   const requestId = genRequestId();
   pendingMap[requestId] = { type, userChatId, username, payload };
@@ -235,16 +206,13 @@ function sendToAdminWithApproveReject({ type, userChatId, username, payload }) {
   });
 }
 
-// ======= User menu actions (reply keyboard) =======
 bot.on("message", async (msg) => {
-  // CONTACT event alohida handlerda; bu umumiy message handler
   if (msg.contact) return;
 
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
   const username = msg.from?.username;
 
-  // 0) SELLER cancel sababi (mavjud bo'lgan funksionallik)
   if (userStates[chatId]?.type === "waitingCancelReason") {
     const { pendingId } = userStates[chatId];
     try {
@@ -258,7 +226,6 @@ bot.on("message", async (msg) => {
         return;
       }
 
-      // Mijozga sababi bilan xabar
       if (pending.buyer?.chatId) {
         await bot.sendMessage(
           pending.buyer.chatId,
@@ -266,7 +233,6 @@ bot.on("message", async (msg) => {
         );
       }
 
-      // Sotuvchiga tasdiq
       await bot.sendMessage(
         chatId,
         `Mahsulot "${pending.name}" bekor qilindi ❌\nSababi: ${text}`
@@ -283,9 +249,7 @@ bot.on("message", async (msg) => {
     }
   }
 
-  // 1) ADMIN answer flow
   if (chatId === ADMIN_CHAT_ID) {
-    // Admin foydalanuvchilar ro'yxati
     if (text === "Foydalanuvchilar ro'yxati") {
       try {
         const users = await User.find({}).select("userName chatId").lean();
@@ -309,7 +273,6 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    // Admin tanlagan foydalanuvchiga “Xabar yozish” bosgan — endi matn kutilyapti
     if (adminStates[chatId]?.type === "waitingDirectMessage") {
       const { targetChatId, targetUsername } = adminStates[chatId];
 
@@ -326,7 +289,6 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    // Admin foydalanuvchi so'rovini TASDIQLAGAN va javob yozishi kutilyapti
     if (adminStates[chatId]?.type === "waitingAdminReply") {
       const { requestId } = adminStates[chatId];
       const req = pendingMap[requestId];
@@ -339,55 +301,45 @@ bot.on("message", async (msg) => {
         return;
       }
 
-      // userga admin javobi
       await bot.sendMessage(
         req.userChatId,
         `Admin sizning xabaringizni qabul qildi ✅\nJavobi: ${text}`
       );
 
-      // adminga tasdiq
       await bot.sendMessage(chatId, "Javob yuborildi va suhbat yakunlandi ✅");
 
-      // tozalash
       delete pendingMap[requestId];
       delete adminStates[chatId];
       return;
     }
 
-    // Admin uchun qolgan matnlar default — menyu allaqachon bor.
     return;
   }
 
-  // 2) USER flows (reply keyboard tugmalari)
-  // Agar user “Adminga bog‘lanish📲”
   if (text === "Adminga bog‘lanish📲") {
     userStates[chatId] = { type: "contactAdmin" };
     await bot.sendMessage(chatId, "Xabaringizni yozing — adminga yuboramiz:");
     return;
   }
 
-  // “Mahsulot egasidan Shikoyat⚠️” — 3 bosqichli wizard
   if (text === "Mahsulot egasidan Shikoyat⚠️") {
     userStates[chatId] = { type: "complaint_step1", temp: {} };
     await bot.sendMessage(chatId, "Mahsulot nomini yuboring:");
     return;
   }
 
-  // “Saytdagi Muammolar🐞”
   if (text === "Saytdagi Muammolar🐞") {
     userStates[chatId] = { type: "issue" };
     await bot.sendMessage(chatId, "Qaysi muammo yuz berdi? Xabar qoldiring:");
     return;
   }
 
-  // “Saytimizga takliflar📃”
   if (text === "Saytimizga takliflar📃") {
     userStates[chatId] = { type: "suggestion" };
     await bot.sendMessage(chatId, "Taklifingizni yozing:");
     return;
   }
 
-  // “Savdo X saytida mahsulot sotish🛒” — hozircha adminga yo‘naltiramiz
   if (text === "Savdo X saytida mahsulot sotish🛒") {
     userStates[chatId] = { type: "contactAdmin" };
     await bot.sendMessage(
@@ -397,10 +349,8 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // === USER STATES HANDLE ===
   const uState = userStates[chatId];
 
-  // User — Adminga bog'lanish matni
   if (uState?.type === "contactAdmin") {
     sendToAdminWithApproveReject({
       type: "contact_admin",
@@ -416,7 +366,6 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // User — Shikoyat wizard
   if (uState?.type === "complaint_step1") {
     uState.temp.productName = text;
     uState.type = "complaint_step2";
@@ -453,7 +402,6 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // User — Muammo xabari
   if (uState?.type === "issue") {
     sendToAdminWithApproveReject({
       type: "issue",
@@ -469,7 +417,6 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // User — Taklif xabari
   if (uState?.type === "suggestion") {
     sendToAdminWithApproveReject({
       type: "suggestion",
@@ -484,18 +431,13 @@ bot.on("message", async (msg) => {
     delete userStates[chatId];
     return;
   }
-
-  // Aks holda — hech narsa qilmaymiz (oddiy chat)
 });
 
-// ======= Admin callback_query handler (tasdiqlash/bekor qilish va foydalanuvchilar ro'yxati) =======
 bot.on("callback_query", async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data || "";
 
-  // ========== Mavjud pending product approve/reject (sotuvchi oqimi) ==========
   if (data.startsWith("approve_") || data.startsWith("reject_")) {
-    // Bu blok — SENING AVVALDAN BOR koding, saqlab qolindi:
     const [action, pendingId] = data.split("_");
     try {
       const pending = await PendingProduct.findById(pendingId)
@@ -526,7 +468,6 @@ bot.on("callback_query", async (query) => {
       } else if (action === "reject") {
         await bot.sendMessage(chatId, "Bekor qilish sababini yozing:");
         userStates[chatId] = { type: "waitingCancelReason", pendingId };
-        // keyingi xabarni message handler oladi
       }
 
       await bot.answerCallbackQuery(query.id);
@@ -538,14 +479,11 @@ bot.on("callback_query", async (query) => {
     }
   }
 
-  // ========== Quyidagilar — ADMIN boshqaruvi ==========
-  // faqat admin ishlata olsin
   if (chatId !== ADMIN_CHAT_ID) {
     await bot.answerCallbackQuery(query.id, { text: "Ruxsat yo'q." });
     return;
   }
 
-  // Admin: foydalanuvchini ro'yxatdan tanlash
   if (data.startsWith("pick_user_")) {
     const [, , targetChatIdStr, targetUsernameRaw] = data.split("_");
     const targetChatId = Number(targetChatIdStr);
@@ -579,7 +517,6 @@ bot.on("callback_query", async (query) => {
     return;
   }
 
-  // Admin: tanlangan userga yozishni boshlash
   if (data.startsWith("start_chat_")) {
     const [, , targetChatIdStr] = data.split("_");
     const targetChatId = Number(targetChatIdStr);
@@ -608,12 +545,10 @@ bot.on("callback_query", async (query) => {
     return;
   }
 
-  // Admin: user so'rovini tasdiqlash/bekor qilish (Adminga bog'lanish / Shikoyat / Muammo / Taklif)
-  // Admin tomonidan tasdiqlash yoki rad etish
   if (data.startsWith("admin_approve_") || data.startsWith("admin_reject_")) {
     const parts = data.split("_");
-    const action = parts.slice(0, 2).join("_"); // "admin_approve" yoki "admin_reject"
-    const requestId = parts.slice(2).join("_"); // qolgan qismi — to'liq ID
+    const action = parts.slice(0, 2).join("_");
+    const requestId = parts.slice(2).join("_");
 
     const req = pendingMap[requestId];
     if (!req) {
@@ -642,7 +577,6 @@ bot.on("callback_query", async (query) => {
     return;
   }
 
-  // Admin foydalanuvchi yozgan javobni foydalanuvchiga yuboradi
   if (data.startsWith("send_reply_")) {
     const requestId = data.replace("send_reply_", "");
     const req = pendingMap[requestId];
@@ -658,12 +592,71 @@ bot.on("callback_query", async (query) => {
     return;
   }
 
-  // boshqa callbacklar yo'q
   await bot.answerCallbackQuery(query.id).catch(() => {});
 });
 
-// ====== Console ======
+bot.on("callback_query", async (query) => {
+  const chatId = query.message.chat.id;
+  const data = query.data;
+
+  if (data.startsWith("approve_")) {
+    const pendingId = data.split("_")[1];
+
+    // Sellerdan manzil so‘rash
+    sellerAddressMap[chatId] = { pendingId, step: "waiting_address" };
+    await bot.sendMessage(
+      chatId,
+      "✅ Buyurtma tasdiqlandi.\n📍 Iltimos, mijoz manzilini kiriting:"
+    );
+  }
+
+  if (data.startsWith("reject_")) {
+    const pendingId = data.split("_")[1];
+    try {
+      await axios.delete(`${process.env.API_URL}/pending/delete/${pendingId}`, {
+        headers: { Authorization: `Bearer ${process.env.SELLER_TOKEN}` },
+      });
+      await bot.sendMessage(chatId, "❌ Buyurtma bekor qilindi.");
+    } catch (err) {
+      console.error(err.message);
+      await bot.sendMessage(chatId, "Bekor qilishda xatolik yuz berdi.");
+    }
+  }
+});
+
+// Seller manzil yuborganda
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  if (
+    sellerAddressMap[chatId] &&
+    sellerAddressMap[chatId].step === "waiting_address"
+  ) {
+    const { pendingId } = sellerAddressMap[chatId];
+
+    try {
+      await axios.post(
+        `${process.env.API_URL}/delivery/add/${pendingId}`,
+        { address: text },
+        {
+          headers: { Authorization: `Bearer ${process.env.SELLER_TOKEN}` },
+        }
+      );
+
+      await bot.sendMessage(
+        chatId,
+        "🚚 Mahsulot yetkazish jarayoniga o‘tkazildi!"
+      );
+    } catch (err) {
+      console.error(err.message);
+      await bot.sendMessage(chatId, "Manzilni saqlashda xatolik yuz berdi.");
+    }
+
+    delete sellerAddressMap[chatId];
+  }
+});
+
 console.log("Telegram bot webhook sozlandi ✅");
 
-// ====== EXPORT ======
 module.exports = { bot, setupWebhook };

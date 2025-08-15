@@ -11,11 +11,11 @@ const basketRouter = require("./routes/basketProduct.js");
 const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
+const deliveryProducts = require("./routes/delivery.products.routes.js");
 
 require("dotenv").config();
 const { bot, setupWebhook } = require("./bot/index.js");
 
-// Bot webhookni sozlash
 setupWebhook(app);
 
 app.use(
@@ -33,6 +33,7 @@ app.use("/basket", basketRouter);
 app.use("/api/comments", commentRouter);
 app.use(avatarRouter);
 app.use("/pending/products", pendingRoutes);
+app.use("/delivery/products", deliveryProducts);
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -62,10 +63,9 @@ const tokenCheck = (req, res, next) => {
 };
 
 app.post("/api/register", async (req, res) => {
-  const { name, surname, phone, password } = req.body; // userName o‘rniga phone
+  const { name, surname, phone, password } = req.body;
 
   try {
-    // Bot orqali start bosilganligini va phone mavjudligini tekshirish
     const user = await User.findOne({
       phone,
       chatId: { $ne: null },
@@ -78,13 +78,11 @@ app.post("/api/register", async (req, res) => {
       });
     }
 
-    // Foydalanuvchi ma'lumotlarini yangilash
     user.name = name;
     user.surname = surname;
-    user.password = password; // pre-save hook ishlaydi (hash)
+    user.password = password;
     await user.save();
 
-    // JWT token yaratish
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, {
       expiresIn: "24h",
     });
@@ -103,17 +101,14 @@ app.post("/api/login", async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    // Telefon raqam orqali userni topamiz
     const user = await User.findOne({ phone });
     if (!user)
       return res.status(400).json({ message: "Telefon raqam notog‘ri" });
 
-    // Password tekshirish
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: "Telefon raqam yoki parol xato" });
 
-    // JWT token
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, { expiresIn: "24h" });
 
     res.json({

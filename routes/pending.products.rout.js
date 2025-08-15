@@ -62,7 +62,6 @@ router.post("/add", tokenCheck, async (req, res) => {
       await pending.save();
       pendingProducts.push(pending);
 
-      // BOT ga sellerga xabar yuborish
       try {
         await bot.sendMessage(
           basketItem.product.createdBy.chatId,
@@ -116,14 +115,13 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
   }
 });
 
-// GET /my-pending/seller
 router.get("/my-pending/seller", tokenCheck, async (req, res) => {
   try {
     const pendingOrders = await PendingProduct.find({
-      createdBy: req.userId, // faqat o'z yaratgan mahsulotlari
+      createdBy: req.userId, 
     })
       .populate("buyer", "name userName")
-      .populate("product"); // buyer va product ma'lumotlari
+      .populate("product"); 
 
     res.json(pendingOrders);
   } catch (err) {
@@ -132,7 +130,6 @@ router.get("/my-pending/seller", tokenCheck, async (req, res) => {
   }
 });
 
-// DELETE /pending/delete/:id
 router.delete("/delete/:id", tokenCheck, async (req, res) => {
   try {
     const { id } = req.params;
