@@ -6,7 +6,7 @@ const schemaCreateAccount = new mongoose.Schema({
   surname: String,
   userName: {
     type: String,
-    required: [true, "User Name kiritilishi shart"],
+    required: [false, "User Name kiritilishi shart"],
     unique: true,
   },
   password: {
