@@ -13,6 +13,7 @@ const tokenCheck = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_TOKEN);
     req.userId = decoded.id;
+
     next();
   } catch (err) {
     return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
@@ -21,7 +22,7 @@ const tokenCheck = (req, res, next) => {
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
-    const { orders, phone } = req.body;
+    const { orders, phone, userName } = req.body;
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return res
@@ -55,6 +56,7 @@ router.post("/add", tokenCheck, async (req, res) => {
         quantity: quantity || basketItem.quantity,
         buyer: req.userId,
         phone,
+        userName: req.userName,
       });
 
       await pending.save();
@@ -62,11 +64,11 @@ router.post("/add", tokenCheck, async (req, res) => {
 
       // BOT ga sellerga xabar yuborish
       try {
-        const buyerUser = await basketItem.product.buyer?.userName || "Mijoz";
         await bot.sendMessage(
           basketItem.product.createdBy.chatId,
-          `Sizning mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.\nMijoz: ${req.userName || "Anonim"}`
-          ,
+          `Sizning mahsulotingiz "${
+            basketItem.product.name
+          }" tasdiqlanishi kutilmoqda.\nMijoz: ${userName || "Anonim"}`,
           {
             reply_markup: {
               inline_keyboard: [

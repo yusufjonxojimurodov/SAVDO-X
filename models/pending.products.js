@@ -20,6 +20,7 @@ const pendingProductSchema = new mongoose.Schema({
   quantity: Number,
   buyer: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   phone: String,
+  userName: String,
   createdAt: { type: Date, default: Date.now },
 });
 
