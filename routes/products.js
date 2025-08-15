@@ -11,7 +11,7 @@ const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
 const { removeBackgroundFromImageFile } = require("remove.bg");
 const PendingProduct = require("../models/pending.products.js");
-const bot = require("../bot/index.js")
+const bot = require("../bot/index.js");
 
 const upload = multer({ dest: "temp/" });
 
@@ -125,27 +125,41 @@ router.post(
   async (req, res) => {
     try {
       const { name, description, price, left, model } = req.body;
+
       if (!req.file) {
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
       const inputPath = req.file.path;
-      const outputPath = `uploads/${Date.now()}-no-bg.png`;
+      const outputPath = `uploads/${Date.now()}-processed.png`;
 
-      const result = await removeBackgroundFromImageFile({
-        path: inputPath,
-        apiKey: process.env.REMOVE_BG_API_KEY,
-        size: "auto",
-        type: "auto",
-      });
+      // rasmni PNG formatiga o'tkazish va oq fonni olib tashlash
+      const image = sharp(inputPath).ensureAlpha();
+      const { data, info } = await image
+        .raw()
+        .toBuffer({ resolveWithObject: true });
 
-      await sharp(Buffer.from(result.base64img, "base64"))
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        // oq fon bo'lsa alpha = 0
+        if (r > 240 && g > 240 && b > 240) {
+          data[i + 3] = 0;
+        }
+      }
+
+      await sharp(data, {
+        raw: { width: info.width, height: info.height, channels: 4 },
+      })
         .png()
         .toFile(outputPath);
 
+      // base64ga o‘tkazish (agar kerak bo‘lsa)
       const imageBuffer = fs.readFileSync(outputPath);
       const imageBase64 = imageBuffer.toString("base64");
 
+      // IMGBB yoki boshqa hostingga yuborish (agar xohlansa)
       const formData = new FormData();
       formData.append("image", imageBase64);
 
@@ -155,10 +169,10 @@ router.post(
         { headers: formData.getHeaders() }
       );
 
-      fs.unlinkSync(inputPath);
-
+      fs.unlinkSync(inputPath); // temp faylni o'chirish
       const imageUrl = response.data.data.url;
 
+      // yangi product yaratish
       const newProduct = new ProductModel({
         name,
         description,
@@ -176,12 +190,7 @@ router.post(
 
       res.status(201).json(populatedProduct);
     } catch (err) {
-      console.error("Xatolik:", err.response?.data || err);
-      if (err.name === "ValidationError") {
-        return res
-          .status(404)
-          .json({ message: "Notog‘ri ma'lumot yuborildi!" });
-      }
+      console.error("Xatolik:", err);
       res.status(500).json({ message: "Server xatosi" });
     }
   }
