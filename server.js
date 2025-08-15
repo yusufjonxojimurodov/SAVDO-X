@@ -28,7 +28,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/get/all/products", productsRouter);
 app.use("/basket", basketRouter);
 app.use("/api/comments", commentRouter);
-app.use("/test", avatarRouter);
+app.use(avatarRouter);
 app.use("/pending/products", pendingRoutes);
 
 mongoose
@@ -59,28 +59,29 @@ const tokenCheck = (req, res, next) => {
 };
 
 app.post("/api/register", async (req, res) => {
-  const { name, surname, userName, password } = req.body; // userName orqali tekshiradi
+  const { name, surname, phone, password } = req.body; // userName o‘rniga phone
 
   try {
-    // 1️⃣ Bot orqali start bosilganligini va phone mavjudligini tekshirish
+    // Bot orqali start bosilganligini va phone mavjudligini tekshirish
     const user = await User.findOne({
-      userName,
+      phone,
       chatId: { $ne: null },
-      phone: { $ne: null },
     });
-    if (!user)
+
+    if (!user) {
       return res.status(400).json({
         message:
           "Iltimos, avval botga /start bosing va telefon raqamingizni yuboring",
       });
+    }
 
-    // 2️⃣ Foydalanuvchi ma'lumotlarini yangilash
+    // Foydalanuvchi ma'lumotlarini yangilash
     user.name = name;
     user.surname = surname;
-    user.password = password; // pre-save hook ishlaydi
+    user.password = password; // pre-save hook ishlaydi (hash)
     await user.save();
 
-    // 3️⃣ JWT token yaratish
+    // JWT token yaratish
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, {
       expiresIn: "24h",
     });
@@ -95,28 +96,31 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-app.post("/api/login", async (request, response) => {
+app.post("/api/login", async (req, res) => {
   try {
-    const { userName, password } = request.body;
-    const user = await User.findOne({ userName });
-    if (!user)
-      return response.status(400).json({ message: "User Name Notogri" });
+    const { phone, password } = req.body;
 
+    // Telefon raqam orqali userni topamiz
+    const user = await User.findOne({ phone });
+    if (!user)
+      return res.status(400).json({ message: "Telefon raqam notog‘ri" });
+
+    // Password tekshirish
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return response
-        .status(400)
-        .json({ message: "UserName yoki Password Xato" });
+      return res.status(400).json({ message: "Telefon raqam yoki parol xato" });
 
+    // JWT token
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, { expiresIn: "24h" });
-    response.json({
+
+    res.json({
       token,
       name: user.name,
       surname: user.surname,
-      userName: user.userName,
+      phone: user.phone,
     });
   } catch (error) {
-    response.status(500).json({ message: "Server Xatoligi" });
+    res.status(500).json({ message: "Server xatoligi" });
   }
 });
 
