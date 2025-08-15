@@ -22,7 +22,7 @@ const tokenCheck = (req, res, next) => {
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
-    const { orders, phone, userName } = req.body;
+    const { orders, phone, userName, quantity } = req.body;
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return res
@@ -68,7 +68,7 @@ router.post("/add", tokenCheck, async (req, res) => {
           basketItem.product.createdBy.chatId,
           `Sizning mahsulotingiz "${
             basketItem.product.name
-          }" tasdiqlanishi kutilmoqda.\nMijoz: ${userName ? '@'+userName : "Anonim"}\nMobil Raqam📞: ${phone}`,
+          }" tasdiqlanishi kutilmoqda.⌚\nMijoz👤: ${userName ? '@'+userName : "Anonim"}\nMobil Raqam📞: ${phone}\nSotib olmoqchi🧺: ${quantity} ta`,
           {
             reply_markup: {
               inline_keyboard: [

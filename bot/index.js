@@ -1,18 +1,20 @@
+require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
+const bodyParser = require("body-parser");
 const User = require("../models/userRegister.js");
 const PendingProduct = require("../models/pending.products.js");
-const bodyParser = require("body-parser");
-
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
+const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID || 0);
 
 if (!token) console.error("BOT_TOKEN topilmadi!");
 if (!URL) console.error("URL topilmadi!");
+if (!ADMIN_CHAT_ID) console.error("ADMIN_CHAT_ID topilmadi yoki noto'g'ri!");
 
 const bot = new TelegramBot(token, { webHook: true });
 bot.setWebHook(`${URL}/bot${token}`);
 
-// Telegram webhook uchun raw body middleware
+// ===== Webhook middleware =====
 function setupWebhook(app) {
   app.use(
     `/bot${token}`,
@@ -35,26 +37,63 @@ function setupWebhook(app) {
   });
 }
 
+// ====== State storages ======
+/**
+ * userStates — foydalanuvchilar uchun turli holatlar:
+ *   - waitingCancelReason      (sotuvchi -> bekor qilish sababi)
+ *   - contactAdmin             (user -> adminga bog'lanish, xabar yozishi)
+ *   - complaint_step1/2/3     (user -> shikoyat wizard)
+ */
 const userStates = {};
-const blockedUsers = {};
-const usersInfo = {};
 
-// Bot funksiyalari
+/**
+ * adminStates — admin uchun holatlar:
+ *   - waitingAdminReply {requestId}
+ *   - selectedUser {targetChatId, targetUsername}
+ *   - waitingDirectMessage {targetChatId, targetUsername}
+ */
+const adminStates = {};
+
+/**
+ * pendingMap — admin tasdiqlash/bekor qilish uchun yuborilgan user so'rovlari
+ *  requestId => { type, userChatId, username, payload }
+ *   type: 'contact_admin' | 'complaint' | 'issue' | 'suggestion'
+ */
+const pendingMap = {};
+
+// ====== UI helpers ======
+const USER_MENU = {
+  keyboard: [
+    ["Adminga bog‘lanish📲"],
+    ["Mahsulot egasidan Shikoyat⚠️"],
+    ["Saytdagi Muammolar🐞"],
+    ["Saytimizga takliflar📃"],
+    ["Savdo X saytida mahsulot sotish🛒"],
+  ],
+  resize_keyboard: true,
+  one_time_keyboard: false,
+};
+
+const ADMIN_MENU = {
+  keyboard: [
+    ["Adminga bog‘lanish📲"],
+    ["Mahsulot egasidan Shikoyat⚠️"],
+    ["Saytdagi Muammolar🐞"],
+    ["Saytimizga takliflar📃"],
+    ["Savdo X saytida mahsulot sotish🛒"],
+    ["Foydalanuvchilar ro'yxati"],
+  ],
+  resize_keyboard: true,
+  one_time_keyboard: false,
+};
+
 function sendMainMenu(chatId, userName) {
-  const text = `*Salom ${userName}!* \nSavdo X telegram botiga Xush Kelibsiz😊!`;
+  const text = `*Salom ${
+    userName ? "@" + userName : "foydalanuvchi"
+  }!* \nSavdo X telegram botiga Xush Kelibsiz😊!`;
   const options = {
     parse_mode: "Markdown",
-    reply_markup: {
-      keyboard: [
-        ["Adminga bog‘lanish📲"],
-        ["Mahsulot egasidan Shikoyat⚠️"],
-        ["Saytdagi Muammolar🐞"],
-        ["Saytimizga takliflar📃"],
-        ["Savdo X saytida mahsulot sotish🛒"],
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: true,
-    },
+    reply_markup: USER_MENU,
   };
   bot.sendMessage(chatId, text, options).catch(console.error);
 }
@@ -63,50 +102,71 @@ function sendAdminMenu(chatId) {
   const text = "Xush kelibsiz, Admin! Quyidagi menyudan tanlang:";
   bot
     .sendMessage(chatId, text, {
-      reply_markup: {
-        keyboard: [
-          ["Adminga bog‘lanish📲"],
-          ["Mahsulot egasidan Shikoyat⚠️"],
-          ["Saytdagi Muammolar🐞"],
-          ["Saytimizga takliflar📃"],
-          ["Savdo X saytida mahsulot sotish🛒"],
-          ["Foydalanuvchilar ro'yxati"],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
+      reply_markup: ADMIN_MENU,
     })
     .catch(console.error);
 }
 
-// /start komandasi
-bot.onText(/\/start/, (msg) => {
+function asAt(username) {
+  if (!username) return "Anonim";
+  return username.startsWith("@") ? username : "@" + username;
+}
+
+function genRequestId() {
+  return `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+}
+
+// ===== START (/start) =====
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const userName = msg.from.username;
-  if (!userName) {
+  const username = msg.from.username;
+
+  if (!username) {
     bot.sendMessage(
       chatId,
-      "Sizning Telegram username topilmadi. Iltimos, username bilan botga kiring!"
+      "Sizning Telegram username topilmadi. Iltimos, Telegram sozlamalaridan username o‘rnatib qayta /start yuboring."
     );
     return;
   }
 
-  bot.sendMessage(chatId, "Iltimos, telefon raqamingizni yuboring:", {
-    reply_markup: {
-      keyboard: [[{ text: "Telefon raqamni yuborish", request_contact: true }]],
-      resize_keyboard: true,
-      one_time_keyboard: true,
-    },
-  });
+  try {
+    let user = await User.findOne({ userName: username });
+
+    // Agar foydalanuvchi DBda bor va phone saqlangan bo'lsa: menyularni ko'rsatamiz, telefon so'ramaymiz
+    if (user && user.phone) {
+      // chatId ni har ehtimol yangilab qo'yamiz
+      if (user.chatId !== chatId) {
+        user.chatId = chatId;
+        await user.save();
+      }
+      if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
+      else sendMainMenu(chatId, username);
+      return;
+    }
+
+    // Bo'lmasa yoki phone yo'q bo'lsa — telefonni so'raymiz
+    bot.sendMessage(chatId, "Iltimos, telefon raqamingizni yuboring:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "Telefon raqamni yuborish", request_contact: true }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+  } catch (err) {
+    console.error("START xato:", err);
+    bot.sendMessage(chatId, "Xatolik yuz berdi.");
+  }
 });
 
-// Contact kelganda saqlash
+// ===== Contact kelganda saqlash =====
 bot.on("contact", async (msg) => {
   const chatId = msg.chat.id;
-  const phone = msg.contact.phone_number;
-  const userName = msg.from.username;
+  const phone = msg.contact?.phone_number;
+  const username = msg.from.username;
 
-  if (!userName) {
+  if (!username) {
     bot.sendMessage(
       chatId,
       "Username topilmadi, botni username bilan ishlating."
@@ -115,9 +175,9 @@ bot.on("contact", async (msg) => {
   }
 
   try {
-    let user = await User.findOne({ userName });
+    let user = await User.findOne({ userName: username });
     if (!user) {
-      user = new User({ userName, chatId, phone });
+      user = new User({ userName: username, chatId, phone });
       await user.save();
       bot.sendMessage(
         chatId,
@@ -129,111 +189,462 @@ bot.on("contact", async (msg) => {
       await user.save();
       bot.sendMessage(chatId, "Telefon raqamingiz yangilandi ✅");
     }
+
+    // Telefon saqlangach menyu ko'rsatamiz
+    if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
+    else sendMainMenu(chatId, username);
   } catch (err) {
-    console.error("Foydalanuvchi saqlanmadi:", err.message);
+    console.error("Foydalanuvchi saqlanmadi:", err);
     bot.sendMessage(chatId, `Xatolik yuz berdi: ${err.message}`);
   }
 });
 
-// callback_query handler
-bot.on("callback_query", async (query) => {
-  const chatId = query.message.chat.id;
-  const data = query.data;
-  const [action, pendingId] = data.split("_");
+// ======= Inline helpers (admin tasdiqlash/bekor qilish) =======
+function sendToAdminWithApproveReject({ type, userChatId, username, payload }) {
+  const requestId = genRequestId();
+  pendingMap[requestId] = { type, userChatId, username, payload };
 
-  try {
-    const pending = await PendingProduct.findById(pendingId)
-      .populate("buyer")
-      .populate("product");
+  let title = "";
+  if (type === "contact_admin") title = "Adminga bog‘lanish so‘rovi";
+  else if (type === "complaint") title = "Mahsulot egasidan shikoyat";
+  else if (type === "issue") title = "Saytdagi muammo xabari";
+  else if (type === "suggestion") title = "Saytga taklif";
 
-    if (!pending) {
-      return bot.answerCallbackQuery(query.id, {
-        text: "Pending product topilmadi",
-      });
-    }
+  const text =
+    `🆕 *${title}*\n` +
+    `*Foydalanuvchi:* ${asAt(username)}\n` +
+    `*Xabar:* ${payload.text}` +
+    (payload.extra ? `\n${payload.extra}` : "");
 
-    const buyerChatId = pending.buyer?.chatId;
+  bot.sendMessage(ADMIN_CHAT_ID, text, {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "Tasdiqlash ✅",
+            callback_data: `admin_approve_${requestId}`,
+          },
+          {
+            text: "Bekor qilish ❌",
+            callback_data: `admin_reject_${requestId}`,
+          },
+        ],
+      ],
+    },
+  });
+}
 
-    if (action === "approve") {
-      await PendingProduct.findByIdAndDelete(pendingId);
-      await bot.editMessageText(`Mahsulot "${pending.name}" tasdiqlandi ✅`, {
-        chat_id: chatId,
-        message_id: query.message.message_id,
-      });
-      if (buyerChatId) {
+// ======= User menu actions (reply keyboard) =======
+bot.on("message", async (msg) => {
+  // CONTACT event alohida handlerda; bu umumiy message handler
+  if (msg.contact) return;
+
+  const chatId = msg.chat.id;
+  const text = msg.text?.trim();
+  const username = msg.from?.username;
+
+  // 0) SELLER cancel sababi (mavjud bo'lgan funksionallik)
+  if (userStates[chatId]?.type === "waitingCancelReason") {
+    const { pendingId } = userStates[chatId];
+    try {
+      const pending = await PendingProduct.findById(pendingId)
+        .populate("buyer")
+        .populate("product");
+
+      if (!pending) {
+        await bot.sendMessage(chatId, "Pending product topilmadi.");
+        delete userStates[chatId];
+        return;
+      }
+
+      // Mijozga sababi bilan xabar
+      if (pending.buyer?.chatId) {
         await bot.sendMessage(
-          buyerChatId,
-          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" tasdiqlandi!`
+          pending.buyer.chatId,
+          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" bekor qilindi.\nSababi: ${text}`
         );
       }
-    } else if (action === "reject") {
-      // Sotuvchidan sabab so‘rash
-      await bot.sendMessage(chatId, "Bekor qilish sababini yozing:");
-      userStates[chatId] = { type: "waitingCancelReason", pendingId };
 
-      return; // keyingi kodni to‘xtatamiz, sabab kelgach ishlaydi
-    }
+      // Sotuvchiga tasdiq
+      await bot.sendMessage(
+        chatId,
+        `Mahsulot "${pending.name}" bekor qilindi ❌\nSababi: ${text}`
+      );
 
-    await bot.answerCallbackQuery(query.id);
-  } catch (err) {
-    console.error("Callback query xato:", err);
-    await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
-  }
-});
-
-// Sotuvchi sabab yozganda
-// Sotuvchi sabab yozganda
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
-
-  // ❗ faqat bekor qilish sababini kutayotgan sotuvchilar uchun ishlaydi
-  if (
-    !userStates[chatId] ||
-    userStates[chatId].type !== "waitingCancelReason"
-  ) {
-    return; // boshqa xabarlarni qayta ishlamaymiz
-  }
-
-  const { pendingId } = userStates[chatId];
-
-  try {
-    const pending = await PendingProduct.findById(pendingId)
-      .populate("buyer")
-      .populate("product");
-
-    if (!pending) {
-      await bot.sendMessage(chatId, "Pending product topilmadi.");
+      await PendingProduct.findByIdAndDelete(pendingId);
+      delete userStates[chatId];
+      return;
+    } catch (err) {
+      console.error("Bekor qilish xato:", err);
+      await bot.sendMessage(chatId, "Xatolik yuz berdi.");
       delete userStates[chatId];
       return;
     }
+  }
 
-    // Mijozga xabar yuborish
-    if (pending.buyer?.chatId) {
-      await bot.sendMessage(
-        pending.buyer.chatId,
-        `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" bekor qilindi.\nSababi: ${text}`
-      );
+  // 1) ADMIN answer flow
+  if (chatId === ADMIN_CHAT_ID) {
+    // Admin foydalanuvchilar ro'yxati
+    if (text === "Foydalanuvchilar ro'yxati") {
+      try {
+        const users = await User.find({}).select("userName chatId").lean();
+        if (!users.length) {
+          await bot.sendMessage(chatId, "Hozircha foydalanuvchilar yo‘q.");
+          return;
+        }
+        const rows = users.map((u) => [
+          {
+            text: asAt(u.userName),
+            callback_data: `pick_user_${u.chatId}_${u.userName || ""}`,
+          },
+        ]);
+        await bot.sendMessage(chatId, "Foydalanuvchilar ro‘yxati:", {
+          reply_markup: { inline_keyboard: rows },
+        });
+      } catch (err) {
+        console.error("User list xato:", err);
+        await bot.sendMessage(chatId, "Xatolik yuz berdi.");
+      }
+      return;
     }
 
-    // Sotuvchiga tasdiq
+    // Admin tanlagan foydalanuvchiga “Xabar yozish” bosgan — endi matn kutilyapti
+    if (adminStates[chatId]?.type === "waitingDirectMessage") {
+      const { targetChatId, targetUsername } = adminStates[chatId];
+
+      await bot.sendMessage(targetChatId, `Admin xabari:\n${text}`);
+
+      await bot.sendMessage(
+        chatId,
+        `Xabar @${
+          targetUsername || "foydalanuvchi"
+        } ga yuborildi va suhbat tugatildi ✅`
+      );
+
+      delete adminStates[chatId];
+      return;
+    }
+
+    // Admin foydalanuvchi so'rovini TASDIQLAGAN va javob yozishi kutilyapti
+    if (adminStates[chatId]?.type === "waitingAdminReply") {
+      const { requestId } = adminStates[chatId];
+      const req = pendingMap[requestId];
+      if (!req) {
+        await bot.sendMessage(
+          chatId,
+          "So'rov topilmadi yoki allaqachon yakunlangan."
+        );
+        delete adminStates[chatId];
+        return;
+      }
+
+      // userga admin javobi
+      await bot.sendMessage(
+        req.userChatId,
+        `Admin sizning xabaringizni qabul qildi ✅\nJavobi: ${text}`
+      );
+
+      // adminga tasdiq
+      await bot.sendMessage(chatId, "Javob yuborildi va suhbat yakunlandi ✅");
+
+      // tozalash
+      delete pendingMap[requestId];
+      delete adminStates[chatId];
+      return;
+    }
+
+    // Admin uchun qolgan matnlar default — menyu allaqachon bor.
+    return;
+  }
+
+  // 2) USER flows (reply keyboard tugmalari)
+  // Agar user “Adminga bog‘lanish📲”
+  if (text === "Adminga bog‘lanish📲") {
+    userStates[chatId] = { type: "contactAdmin" };
+    await bot.sendMessage(chatId, "Xabaringizni yozing — adminga yuboramiz:");
+    return;
+  }
+
+  // “Mahsulot egasidan Shikoyat⚠️” — 3 bosqichli wizard
+  if (text === "Mahsulot egasidan Shikoyat⚠️") {
+    userStates[chatId] = { type: "complaint_step1", temp: {} };
+    await bot.sendMessage(chatId, "Mahsulot nomini yuboring:");
+    return;
+  }
+
+  // “Saytdagi Muammolar🐞”
+  if (text === "Saytdagi Muammolar🐞") {
+    userStates[chatId] = { type: "issue" };
+    await bot.sendMessage(chatId, "Qaysi muammo yuz berdi? Xabar qoldiring:");
+    return;
+  }
+
+  // “Saytimizga takliflar📃”
+  if (text === "Saytimizga takliflar📃") {
+    userStates[chatId] = { type: "suggestion" };
+    await bot.sendMessage(chatId, "Taklifingizni yozing:");
+    return;
+  }
+
+  // “Savdo X saytida mahsulot sotish🛒” — hozircha adminga yo‘naltiramiz
+  if (text === "Savdo X saytida mahsulot sotish🛒") {
+    userStates[chatId] = { type: "contactAdmin" };
     await bot.sendMessage(
       chatId,
-      `Mahsulot "${pending.name}" bekor qilindi ❌\nSababi: ${text}`
+      "Mahsulot sotish bo‘yicha xabaringizni yozing — adminga yuboramiz:"
     );
-
-    await PendingProduct.findByIdAndDelete(pendingId);
-
-    // ✅ State’ni tozalash
-    delete userStates[chatId];
-  } catch (err) {
-    console.error("Bekor qilish xato:", err);
-    await bot.sendMessage(chatId, "Xatolik yuz berdi.");
-    delete userStates[chatId];
+    return;
   }
+
+  // === USER STATES HANDLE ===
+  const uState = userStates[chatId];
+
+  // User — Adminga bog'lanish matni
+  if (uState?.type === "contactAdmin") {
+    sendToAdminWithApproveReject({
+      type: "contact_admin",
+      userChatId: chatId,
+      username,
+      payload: { text },
+    });
+    await bot.sendMessage(
+      chatId,
+      "Xabaringiz adminlarga yuborildi. Javobni kuting ✅"
+    );
+    delete userStates[chatId];
+    return;
+  }
+
+  // User — Shikoyat wizard
+  if (uState?.type === "complaint_step1") {
+    uState.temp.productName = text;
+    uState.type = "complaint_step2";
+    await bot.sendMessage(
+      chatId,
+      "Mahsulot yaratuvchisini (@username) yuboring:"
+    );
+    return;
+  }
+  if (uState?.type === "complaint_step2") {
+    uState.temp.owner = text;
+    uState.type = "complaint_step3";
+    await bot.sendMessage(chatId, "Shikoyat matnini yozing:");
+    return;
+  }
+  if (uState?.type === "complaint_step3") {
+    const payloadText = text;
+    const extra = `\n*Mahsulot:* ${
+      uState.temp.productName
+    }\n*Yaratuvchi:* ${asAt(uState.temp.owner)}`;
+
+    sendToAdminWithApproveReject({
+      type: "complaint",
+      userChatId: chatId,
+      username,
+      payload: { text: payloadText, extra },
+    });
+
+    await bot.sendMessage(
+      chatId,
+      "Shikoyatingiz adminlarga yuborildi. Javobni kuting ✅"
+    );
+    delete userStates[chatId];
+    return;
+  }
+
+  // User — Muammo xabari
+  if (uState?.type === "issue") {
+    sendToAdminWithApproveReject({
+      type: "issue",
+      userChatId: chatId,
+      username,
+      payload: { text },
+    });
+    await bot.sendMessage(
+      chatId,
+      "Xabaringiz adminlarga yuborildi. Javobni kuting ✅"
+    );
+    delete userStates[chatId];
+    return;
+  }
+
+  // User — Taklif xabari
+  if (uState?.type === "suggestion") {
+    sendToAdminWithApproveReject({
+      type: "suggestion",
+      userChatId: chatId,
+      username,
+      payload: { text },
+    });
+    await bot.sendMessage(
+      chatId,
+      "Taklifingiz adminlarga yuborildi. Javobni kuting ✅"
+    );
+    delete userStates[chatId];
+    return;
+  }
+
+  // Aks holda — hech narsa qilmaymiz (oddiy chat)
 });
 
+// ======= Admin callback_query handler (tasdiqlash/bekor qilish va foydalanuvchilar ro'yxati) =======
+bot.on("callback_query", async (query) => {
+  const chatId = query.message.chat.id;
+  const data = query.data || "";
+
+  // ========== Mavjud pending product approve/reject (sotuvchi oqimi) ==========
+  if (data.startsWith("approve_") || data.startsWith("reject_")) {
+    // Bu blok — SENING AVVALDAN BOR koding, saqlab qolindi:
+    const [action, pendingId] = data.split("_");
+    try {
+      const pending = await PendingProduct.findById(pendingId)
+        .populate("buyer")
+        .populate("product");
+
+      if (!pending) {
+        await bot.answerCallbackQuery(query.id, {
+          text: "Pending product topilmadi",
+        });
+        return;
+      }
+
+      const buyerChatId = pending.buyer?.chatId;
+
+      if (action === "approve") {
+        await PendingProduct.findByIdAndDelete(pendingId);
+        await bot.editMessageText(`Mahsulot "${pending.name}" tasdiqlandi ✅`, {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+        });
+        if (buyerChatId) {
+          await bot.sendMessage(
+            buyerChatId,
+            `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" tasdiqlandi!`
+          );
+        }
+      } else if (action === "reject") {
+        await bot.sendMessage(chatId, "Bekor qilish sababini yozing:");
+        userStates[chatId] = { type: "waitingCancelReason", pendingId };
+        // keyingi xabarni message handler oladi
+      }
+
+      await bot.answerCallbackQuery(query.id);
+      return;
+    } catch (err) {
+      console.error("Callback query xato:", err);
+      await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
+      return;
+    }
+  }
+
+  // ========== Quyidagilar — ADMIN boshqaruvi ==========
+  // faqat admin ishlata olsin
+  if (chatId !== ADMIN_CHAT_ID) {
+    await bot.answerCallbackQuery(query.id, { text: "Ruxsat yo'q." });
+    return;
+  }
+
+  // Admin: foydalanuvchini ro'yxatdan tanlash
+  if (data.startsWith("pick_user_")) {
+    const [, , targetChatIdStr, targetUsernameRaw] = data.split("_");
+    const targetChatId = Number(targetChatIdStr);
+    const targetUsername = targetUsernameRaw || "";
+
+    adminStates[chatId] = {
+      type: "selectedUser",
+      targetChatId,
+      targetUsername,
+    };
+
+    await bot.sendMessage(
+      chatId,
+      `Tanlangan foydalanuvchi: ${asAt(targetUsername)}\nNimani qilamiz?`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "Xabar yozish 📝",
+                callback_data: `start_chat_${targetChatId}`,
+              },
+            ],
+            [{ text: "Suhbatni tugatish ❌", callback_data: `end_chat` }],
+          ],
+        },
+      }
+    );
+
+    await bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // Admin: tanlangan userga yozishni boshlash
+  if (data.startsWith("start_chat_")) {
+    const [, , targetChatIdStr] = data.split("_");
+    const targetChatId = Number(targetChatIdStr);
+
+    const st = adminStates[chatId];
+    if (!st || st.type !== "selectedUser" || st.targetChatId !== targetChatId) {
+      await bot.answerCallbackQuery(query.id, { text: "Sessiya topilmadi." });
+      return;
+    }
+
+    adminStates[chatId] = {
+      type: "waitingDirectMessage",
+      targetChatId,
+      targetUsername: st.targetUsername,
+    };
+
+    await bot.sendMessage(chatId, "Xabaringizni yozing:");
+    await bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  if (data === "end_chat") {
+    delete adminStates[chatId];
+    await bot.sendMessage(chatId, "Suhbat tugatildi ✅");
+    await bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // Admin: user so'rovini tasdiqlash/bekor qilish (Adminga bog'lanish / Shikoyat / Muammo / Taklif)
+  if (data.startsWith("admin_approve_") || data.startsWith("admin_reject_")) {
+    const [action, , requestId] = data.split("_");
+    const req = pendingMap[requestId];
+
+    if (!req) {
+      await bot.answerCallbackQuery(query.id, { text: "So'rov topilmadi." });
+      return;
+    }
+
+    if (action === "admin_approve") {
+      // Admin javob yozishi kerak
+      adminStates[chatId] = { type: "waitingAdminReply", requestId };
+      await bot.sendMessage(
+        chatId,
+        "Xabaringizni yozing (foydalanuvchiga yuboriladi):"
+      );
+    } else {
+      // Bekor qilish — foydalanuvchiga xabar
+      await bot.sendMessage(
+        req.userChatId,
+        "Sizning murojaatingiz bekor qilindi ❌"
+      );
+      delete pendingMap[requestId];
+      await bot.sendMessage(chatId, "Bekor qilindi va yakunlandi.");
+    }
+
+    await bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // boshqa callbacklar yo'q
+  await bot.answerCallbackQuery(query.id).catch(() => {});
+});
+
+// ====== Console ======
 console.log("Telegram bot webhook sozlandi ✅");
 
-// EXPORT qilamiz
+// ====== EXPORT ======
 module.exports = { bot, setupWebhook };
