@@ -182,47 +182,54 @@ bot.on("callback_query", async (query) => {
 });
 
 // Sotuvchi sabab yozganda
+// Sotuvchi sabab yozganda
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
 
-  if (userStates[chatId]?.type === "waitingCancelReason") {
-    const { pendingId } = userStates[chatId];
+  // ❗ faqat bekor qilish sababini kutayotgan sotuvchilar uchun ishlaydi
+  if (
+    !userStates[chatId] ||
+    userStates[chatId].type !== "waitingCancelReason"
+  ) {
+    return; // boshqa xabarlarni qayta ishlamaymiz
+  }
 
-    try {
-      const pending = await PendingProduct.findById(pendingId)
-        .populate("buyer")
-        .populate("product");
+  const { pendingId } = userStates[chatId];
 
-      if (!pending) {
-        bot.sendMessage(chatId, "Pending product topilmadi.");
-        delete userStates[chatId];
-        return;
-      }
+  try {
+    const pending = await PendingProduct.findById(pendingId)
+      .populate("buyer")
+      .populate("product");
 
-      // Mijozga bekor qilindi sababi bilan xabar yuborish
-      if (pending.buyer?.chatId) {
-        await bot.sendMessage(
-          pending.buyer.chatId,
-          `Siz sotib olmoqchi bo‘lgan mahsulotingiz "${pending.name}" bekor qilindi. Sababi: ${text}`
-        );
-      }
-
-      await bot.editMessageText(
-        `Mahsulot "${pending.name}" bekor qilindi ❌\nSababi: ${text}`,
-        {
-          chat_id: chatId,
-          message_id: msg.message_id,
-        }
-      );
-
-      await PendingProduct.findByIdAndDelete(pendingId);
-
+    if (!pending) {
+      await bot.sendMessage(chatId, "Pending product topilmadi.");
       delete userStates[chatId];
-    } catch (err) {
-      console.error("Bekor qilish xato:", err);
-      bot.sendMessage(chatId, "Xatolik yuz berdi.");
+      return;
     }
+
+    // Mijozga xabar yuborish
+    if (pending.buyer?.chatId) {
+      await bot.sendMessage(
+        pending.buyer.chatId,
+        `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" bekor qilindi.\nSababi: ${text}`
+      );
+    }
+
+    // Sotuvchiga tasdiq
+    await bot.sendMessage(
+      chatId,
+      `Mahsulot "${pending.name}" bekor qilindi ❌\nSababi: ${text}`
+    );
+
+    await PendingProduct.findByIdAndDelete(pendingId);
+
+    // ✅ State’ni tozalash
+    delete userStates[chatId];
+  } catch (err) {
+    console.error("Bekor qilish xato:", err);
+    await bot.sendMessage(chatId, "Xatolik yuz berdi.");
+    delete userStates[chatId];
   }
 });
 
