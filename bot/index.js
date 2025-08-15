@@ -84,10 +84,20 @@ module.exports = (app) => {
       .catch(console.error);
   }
 
+  // /start komandasi
   bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
+    const userName = msg.from.username; // Telegram username
 
-    // Foydalanuvchiga contact tugmasini yuboramiz
+    if (!userName) {
+      bot.sendMessage(
+        chatId,
+        "Sizning Telegram username topilmadi. Iltimos, username bilan botga kiring!"
+      );
+      return;
+    }
+
+    // Foydalanuvchiga telefon raqamini yuborish tugmasi
     bot.sendMessage(chatId, "Iltimos, telefon raqamingizni yuboring:", {
       reply_markup: {
         keyboard: [
@@ -99,28 +109,41 @@ module.exports = (app) => {
     });
   });
 
+  // Contact kelganda saqlash
   bot.on("contact", async (msg) => {
     const chatId = msg.chat.id;
     const phone = msg.contact.phone_number;
+    const userName = msg.from.username;
+
+    if (!userName) {
+      bot.sendMessage(
+        chatId,
+        "Username topilmadi, botni username bilan ishlating."
+      );
+      return;
+    }
 
     try {
-      let user = await User.findOne({ chatId });
+      // userName bo'yicha tekshirish
+      let user = await User.findOne({ userName });
 
       if (!user) {
-        user = new User({ phone, chatId });
+        // Foydalanuvchi mavjud bo'lmasa, yangi yaratish
+        user = new User({ userName, chatId, phone });
         await user.save();
         bot.sendMessage(
           chatId,
-          "Telefon raqamingiz muvaffaqiyatli saqlandi ✅"
+          "Telefon raqamingiz va username muvaffaqiyatli saqlandi ✅"
         );
       } else {
-        // Agar allaqachon bo'lsa, phone yangilansin
+        // Foydalanuvchi allaqachon bo'lsa, chatId va phone yangilansin
+        user.chatId = chatId;
         user.phone = phone;
         await user.save();
         bot.sendMessage(chatId, "Telefon raqamingiz yangilandi ✅");
       }
     } catch (err) {
-      console.error("Phone saqlanmadi:", err.message);
+      console.error("Foydalanuvchi saqlanmadi:", err.message);
       bot.sendMessage(chatId, `Xatolik yuz berdi: ${err.message}`);
     }
   });

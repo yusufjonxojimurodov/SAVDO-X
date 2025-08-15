@@ -59,11 +59,15 @@ const tokenCheck = (req, res, next) => {
 };
 
 app.post("/api/register", async (req, res) => {
-  const { name, surname, phone, password } = req.body; // userName o‘rniga phone
+  const { name, surname, userName, password } = req.body; // userName orqali tekshiradi
 
   try {
-    // 1️⃣ Bot orqali start bosilganligini tekshirish
-    const user = await User.findOne({ phone, chatId: { $ne: null } }); // userName o‘rniga phone
+    // 1️⃣ Bot orqali start bosilganligini va phone mavjudligini tekshirish
+    const user = await User.findOne({
+      userName,
+      chatId: { $ne: null },
+      phone: { $ne: null },
+    });
     if (!user)
       return res.status(400).json({
         message:
