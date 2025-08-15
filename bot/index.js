@@ -609,10 +609,13 @@ bot.on("callback_query", async (query) => {
   }
 
   // Admin: user so'rovini tasdiqlash/bekor qilish (Adminga bog'lanish / Shikoyat / Muammo / Taklif)
+  // Admin tomonidan tasdiqlash yoki rad etish
   if (data.startsWith("admin_approve_") || data.startsWith("admin_reject_")) {
-    const [action, , requestId] = data.split("_");
-    const req = pendingMap[requestId];
+    const parts = data.split("_");
+    const action = parts.slice(0, 2).join("_"); // "admin_approve" yoki "admin_reject"
+    const requestId = parts.slice(2).join("_"); // qolgan qismi — to'liq ID
 
+    const req = pendingMap[requestId];
     if (!req) {
       await bot.answerCallbackQuery(query.id, { text: "So'rov topilmadi." });
       return;
@@ -626,7 +629,7 @@ bot.on("callback_query", async (query) => {
         "Xabaringizni yozing (foydalanuvchiga yuboriladi):"
       );
     } else {
-      // Bekor qilish — foydalanuvchiga xabar
+      // Bekor qilish
       await bot.sendMessage(
         req.userChatId,
         "Sizning murojaatingiz bekor qilindi ❌"
@@ -635,6 +638,22 @@ bot.on("callback_query", async (query) => {
       await bot.sendMessage(chatId, "Bekor qilindi va yakunlandi.");
     }
 
+    await bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // Admin foydalanuvchi yozgan javobni foydalanuvchiga yuboradi
+  if (data.startsWith("send_reply_")) {
+    const requestId = data.replace("send_reply_", "");
+    const req = pendingMap[requestId];
+
+    if (!req) {
+      await bot.answerCallbackQuery(query.id, { text: "So'rov topilmadi." });
+      return;
+    }
+
+    adminStates[chatId] = { type: "waitingAdminReply", requestId };
+    await bot.sendMessage(chatId, "Javob matnini kiriting:");
     await bot.answerCallbackQuery(query.id);
     return;
   }
