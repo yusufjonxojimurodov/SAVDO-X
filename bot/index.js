@@ -169,22 +169,33 @@ module.exports = (app) => {
       const pending = await PendingProduct.findById(pendingId)
         .populate("buyer")
         .populate("product");
+
       if (!pending) {
         return bot.answerCallbackQuery(query.id, {
           text: "Pending product topilmadi",
         });
       }
 
+      const buyerChatId = pending.buyer?.chatId;
+      if (!buyerChatId) {
+        console.error("Buyer chatId topilmadi!");
+      }
+
       if (action === "approve") {
+        // agar approve qilinsa DB’dan o‘chirish (optional)
+        await PendingProduct.findByIdAndDelete(pendingId);
+
         await bot.editMessageText(`Mahsulot "${pending.name}" tasdiqlandi ✅`, {
           chat_id: chatId,
           message_id: query.message.message_id,
         });
 
-        await bot.sendMessage(
-          pending.buyer.chatId,
-          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" tasdiqlandi!`
-        );
+        if (buyerChatId) {
+          await bot.sendMessage(
+            buyerChatId,
+            `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" tasdiqlandi!`
+          );
+        }
       } else if (action === "reject") {
         await PendingProduct.findByIdAndDelete(pendingId);
 
@@ -196,16 +207,19 @@ module.exports = (app) => {
           }
         );
 
-        await bot.sendMessage(
-          pending.buyer.chatId,
-          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" sotuvchi tomonidan bekor qilindi.`
-        );
+        if (buyerChatId) {
+          await bot.sendMessage(
+            buyerChatId,
+            `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" sotuvchi tomonidan bekor qilindi.`
+          );
+        }
       }
 
-      bot.answerCallbackQuery(query.id); // tugmani bosishni yakunlash
+      // tugmani bosganini yakunlash
+      await bot.answerCallbackQuery(query.id);
     } catch (err) {
-      console.error(err);
-      bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
+      console.error("Callback query xato:", err);
+      await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
     }
   });
 
