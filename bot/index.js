@@ -167,23 +167,62 @@ bot.on("callback_query", async (query) => {
         );
       }
     } else if (action === "reject") {
-      await PendingProduct.findByIdAndDelete(pendingId);
-      await bot.editMessageText(`Mahsulot "${pending.name}" bekor qilindi ❌`, {
-        chat_id: chatId,
-        message_id: query.message.message_id,
-      });
-      if (buyerChatId) {
-        await bot.sendMessage(
-          buyerChatId,
-          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" sotuvchi tomonidan bekor qilindi.`
-        );
-      }
+      // Sotuvchidan sabab so‘rash
+      await bot.sendMessage(chatId, "Bekor qilish sababini yozing:");
+      userStates[chatId] = { type: "waitingCancelReason", pendingId };
+
+      return; // keyingi kodni to‘xtatamiz, sabab kelgach ishlaydi
     }
 
     await bot.answerCallbackQuery(query.id);
   } catch (err) {
     console.error("Callback query xato:", err);
     await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
+  }
+});
+
+// Sotuvchi sabab yozganda
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  if (userStates[chatId]?.type === "waitingCancelReason") {
+    const { pendingId } = userStates[chatId];
+
+    try {
+      const pending = await PendingProduct.findById(pendingId)
+        .populate("buyer")
+        .populate("product");
+
+      if (!pending) {
+        bot.sendMessage(chatId, "Pending product topilmadi.");
+        delete userStates[chatId];
+        return;
+      }
+
+      // Mijozga bekor qilindi sababi bilan xabar yuborish
+      if (pending.buyer?.chatId) {
+        await bot.sendMessage(
+          pending.buyer.chatId,
+          `Siz sotib olmoqchi bo‘lgan mahsulotingiz "${pending.name}" bekor qilindi. Sababi: ${text}`
+        );
+      }
+
+      await bot.editMessageText(
+        `Mahsulot "${pending.name}" bekor qilindi ❌\nSababi: ${text}`,
+        {
+          chat_id: chatId,
+          message_id: msg.message_id,
+        }
+      );
+
+      await PendingProduct.findByIdAndDelete(pendingId);
+
+      delete userStates[chatId];
+    } catch (err) {
+      console.error("Bekor qilish xato:", err);
+      bot.sendMessage(chatId, "Xatolik yuz berdi.");
+    }
   }
 });
 

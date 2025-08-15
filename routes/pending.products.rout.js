@@ -19,7 +19,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// pending.products.js (router)
 router.post("/add", tokenCheck, async (req, res) => {
   try {
     const { orders, phone } = req.body;
@@ -63,9 +62,12 @@ router.post("/add", tokenCheck, async (req, res) => {
 
       // BOT ga sellerga xabar yuborish
       try {
+        const buyerUser = (await basketItem.product.buyer?.userName) || "Mijoz";
         await bot.sendMessage(
           basketItem.product.createdBy.chatId,
-          `Sizning mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.`,
+          `Sizning mahsulotingiz "${
+            basketItem.product.name
+          }" tasdiqlanishi kutilmoqda.\nMijoz: ${req.userName || "Anonim"}`,
           {
             reply_markup: {
               inline_keyboard: [
