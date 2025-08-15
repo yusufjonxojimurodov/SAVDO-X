@@ -125,35 +125,72 @@ router.post(
   async (req, res) => {
     try {
       const { name, description, price, left, model } = req.body;
+
       if (!req.file) {
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
       const inputPath = req.file.path;
-      const outputPath = `uploads/${Date.now()}-converted.png`;
+      const outputPath = `uploads/${Date.now()}-processed.png`;
 
-      // Sharp bilan PNG formatga o'tkazish
-      await sharp(inputPath)
-        .png({ quality: 100 }) // sifatni yuqori qilish
+      // rasmni PNG formatiga o'tkazish va oq fonni olib tashlash
+      const image = sharp(inputPath).ensureAlpha();
+      const { data, info } = await image
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        // oq fon bo'lsa alpha = 0
+        if (r > 240 && g > 240 && b > 240) {
+          data[i + 3] = 0;
+        }
+      }
+
+      await sharp(data, {
+        raw: { width: info.width, height: info.height, channels: 4 },
+      })
+        .png()
         .toFile(outputPath);
 
-      fs.unlinkSync(inputPath); // temp faylni o'chirish
+      // base64ga o‘tkazish (agar kerak bo‘lsa)
+      const imageBuffer = fs.readFileSync(outputPath);
+      const imageBase64 = imageBuffer.toString("base64");
 
+      // IMGBB yoki boshqa hostingga yuborish (agar xohlansa)
+      const formData = new FormData();
+      formData.append("image", imageBase64);
+
+      const response = await axios.post(
+        `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+        formData,
+        { headers: formData.getHeaders() }
+      );
+
+      fs.unlinkSync(inputPath); // temp faylni o'chirish
+      const imageUrl = response.data.data.url;
+
+      // yangi product yaratish
       const newProduct = new ProductModel({
         name,
         description,
         price,
-        left,
         model,
+        left,
         createdBy: req.userId,
-        image: outputPath, // local saqlash
+        image: imageUrl,
       });
-
       await newProduct.save();
 
-      res.status(201).json(newProduct);
+      const populatedProduct = await ProductModel.findById(
+        newProduct._id
+      ).populate("createdBy", "userName");
+
+      res.status(201).json(populatedProduct);
     } catch (err) {
-      console.error(err);
+      console.error("Xatolik:", err);
       res.status(500).json({ message: "Server xatosi" });
     }
   }
