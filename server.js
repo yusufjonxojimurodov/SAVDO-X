@@ -59,14 +59,15 @@ const tokenCheck = (req, res, next) => {
 };
 
 app.post("/api/register", async (req, res) => {
-  const { name, surname, userName, password } = req.body;
+  const { name, surname, phone, password } = req.body; // userName o‘rniga phone
 
   try {
     // 1️⃣ Bot orqali start bosilganligini tekshirish
-    const user = await User.findOne({ userName, chatId: { $ne: null } });
+    const user = await User.findOne({ phone, chatId: { $ne: null } }); // userName o‘rniga phone
     if (!user)
       return res.status(400).json({
-        message: "Iltimos, avval botga /start bosing",
+        message:
+          "Iltimos, avval botga /start bosing va telefon raqamingizni yuboring",
       });
 
     // 2️⃣ Foydalanuvchi ma'lumotlarini yangilash

@@ -84,41 +84,43 @@ module.exports = (app) => {
       .catch(console.error);
   }
 
-  bot.onText(/\/start/, async (msg) => {
+  bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    const userName = msg.from.username;
 
-    console.log("Telegram username:", userName, "chatId:", chatId);
+    // Foydalanuvchiga contact tugmasini yuboramiz
+    bot.sendMessage(chatId, "Iltimos, telefon raqamingizni yuboring:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "Telefon raqamni yuborish", request_contact: true }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+  });
 
-    if (!userName) {
-      bot.sendMessage(
-        chatId,
-        "Sizning username topilmadi. Telegram username kerak!"
-      );
-      return;
-    }
+  bot.on("contact", async (msg) => {
+    const chatId = msg.chat.id;
+    const phone = msg.contact.phone_number;
 
     try {
-      let user = await User.findOne({ userName });
+      let user = await User.findOne({ chatId });
 
       if (!user) {
-        // Faqat userName va chatId saqlanadi, password bo'sh qoladi
-        user = new User({ userName, chatId });
+        user = new User({ phone, chatId });
         await user.save();
-        console.log("Yangi foydalanuvchi yaratildi:", user);
-        bot.sendMessage(chatId, "Botga start muvaffaqiyatli yuborildi ✅");
-      } else {
-        // Agar allaqachon bo'lsa, chatId yangilansin
-        user.chatId = chatId;
-        await user.save();
-        console.log("ChatId yangilandi:", user.chatId);
         bot.sendMessage(
           chatId,
-          "Siz allaqachon ro'yxatdan o'tgansiz, chatId yangilandi ✅"
+          "Telefon raqamingiz muvaffaqiyatli saqlandi ✅"
         );
+      } else {
+        // Agar allaqachon bo'lsa, phone yangilansin
+        user.phone = phone;
+        await user.save();
+        bot.sendMessage(chatId, "Telefon raqamingiz yangilandi ✅");
       }
     } catch (err) {
-      console.error("ChatId saqlanmadi:", err.message);
+      console.error("Phone saqlanmadi:", err.message);
       bot.sendMessage(chatId, `Xatolik yuz berdi: ${err.message}`);
     }
   });
