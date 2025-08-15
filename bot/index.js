@@ -560,8 +560,10 @@ bot.on("callback_query", async (query) => {
   const data = query.data;
 
   if (data.startsWith("approve_")) {
+    // pendingId ni to‘liq olish
     const [action, ...idParts] = data.split("_");
     const pendingId = idParts.join("_");
+    console.log("Approve pendingId:", pendingId);
 
     // Sellerdan manzil so‘rash
     sellerAddressMap[chatId] = { pendingId, step: "waiting_address" };
@@ -575,7 +577,7 @@ bot.on("callback_query", async (query) => {
     const [action, ...idParts] = data.split("_");
     const pendingId = idParts.join("_");
 
-    // Reject sababini olish uchun step qo‘yish
+    // Sellerdan bekor qilish sababini so‘rash
     sellerAddressMap[chatId] = { pendingId, step: "waiting_reject_reason" };
     await bot.sendMessage(
       chatId,
@@ -595,25 +597,30 @@ bot.on("message", async (msg) => {
 
   const { pendingId, step } = sellerAddressMap[chatId];
 
-  // === Tasdiqlash holati ===
+  // Approve holat: manzil kiritildi
   if (step === "waiting_address") {
     try {
-      // DB ga delivery qo'shish
-      const res = await axios.post(
+      // DeliveryProduct yaratish va PendingProduct o'chirish
+      await axios.post(
         `${
           process.env.API_URL
         }/delivery/products/add/${pendingId}/${encodeURIComponent(text)}`,
         { sellerBot: true }
       );
 
-      // PendingProduct-ni topib mijoz chatId olish
-      const pending = res.data.delivery; // yoki PendingProduct info kerak bo‘lsa fetch qilamiz
-      const buyerChatId = pending.buyerId.chatId; // DB-da buyer chatId saqlangan bo‘lsa
+      // PendingProduct ma’lumotlarini olish (mijoz chatId va productName)
+      const pendingRes = await axios.get(
+        `${process.env.API_URL}/pending/products/${pendingId}`
+      );
+      const pending = pendingRes.data;
+      const buyerChatId = pending.buyer.chatId;
+      const productName = pending.name;
 
+      // Mijozga xabar yuborish
       if (buyerChatId) {
         await bot.sendMessage(
           buyerChatId,
-          `🚚 Mahsulotingiz "${pending.name}" tasdiqlandi va 24 soat ichida yetkazib beriladi.`
+          `🚚 Mahsulotingiz "${productName}" tasdiqlandi va 24 soat ichida yetkazib beriladi.`
         );
       }
 
@@ -627,25 +634,26 @@ bot.on("message", async (msg) => {
     }
   }
 
-  // === Bekor qilish holati ===
+  // Reject holat: sabab yozildi
   if (step === "waiting_reject_reason") {
     try {
-      // PendingProduct info olish
+      // PendingProduct ma’lumotlarini olish
       const pendingRes = await axios.get(
         `${process.env.API_URL}/pending/products/${pendingId}`
       );
       const pending = pendingRes.data;
       const buyerChatId = pending.buyer.chatId;
+      const productName = pending.name;
 
       // Mijozga xabar yuborish
       if (buyerChatId) {
         await bot.sendMessage(
           buyerChatId,
-          `❌ Mahsulotingiz "${pending.name}" bekor qilindi.\nSabab: ${text}`
+          `❌ Mahsulotingiz "${productName}" bekor qilindi.\nSabab: ${text}`
         );
       }
 
-      // PendingProduct DB-dan o'chirish
+      // PendingProduct o'chirish
       await axios.delete(
         `${process.env.API_URL}/pending/products/delete/${pendingId}`
       );
