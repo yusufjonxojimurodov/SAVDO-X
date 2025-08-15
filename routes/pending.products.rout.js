@@ -68,7 +68,7 @@ router.post("/add", tokenCheck, async (req, res) => {
           basketItem.product.createdBy.chatId,
           `Sizning mahsulotingiz "${
             basketItem.product.name
-          }" tasdiqlanishi kutilmoqda.\nMijoz: ${userName || "Anonim"}`,
+          }" tasdiqlanishi kutilmoqda.\nMijoz: ${userName ? '@'+userName : "Anonim"}\nMobil Raqam📞: ${phone}`,
           {
             reply_markup: {
               inline_keyboard: [
