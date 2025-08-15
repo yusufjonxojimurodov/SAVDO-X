@@ -6,6 +6,7 @@ const PendingProduct = require("../models/pending.products.js");
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID || 0);
+const axios = require("axios")
 
 if (!token) console.error("BOT_TOKEN topilmadi!");
 if (!URL) console.error("URL topilmadi!");
