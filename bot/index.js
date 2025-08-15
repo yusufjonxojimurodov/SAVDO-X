@@ -6,7 +6,7 @@ const PendingProduct = require("../models/pending.products.js");
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID || 0);
-const axios = require("axios")
+const axios = require("axios");
 
 if (!token) console.error("BOT_TOKEN topilmadi!");
 if (!URL) console.error("URL topilmadi!");
@@ -438,48 +438,6 @@ bot.on("callback_query", async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data || "";
 
-  if (data.startsWith("approve_") || data.startsWith("reject_")) {
-    const [action, pendingId] = data.split("_");
-    try {
-      const pending = await PendingProduct.findById(pendingId)
-        .populate("buyer")
-        .populate("product");
-
-      if (!pending) {
-        await bot.answerCallbackQuery(query.id, {
-          text: "Pending product topilmadi",
-        });
-        return;
-      }
-
-      const buyerChatId = pending.buyer?.chatId;
-
-      if (action === "approve") {
-        await PendingProduct.findByIdAndDelete(pendingId);
-        await bot.editMessageText(`Mahsulot "${pending.name}" tasdiqlandi ✅`, {
-          chat_id: chatId,
-          message_id: query.message.message_id,
-        });
-        if (buyerChatId) {
-          await bot.sendMessage(
-            buyerChatId,
-            `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" tasdiqlandi!`
-          );
-        }
-      } else if (action === "reject") {
-        await bot.sendMessage(chatId, "Bekor qilish sababini yozing:");
-        userStates[chatId] = { type: "waitingCancelReason", pendingId };
-      }
-
-      await bot.answerCallbackQuery(query.id);
-      return;
-    } catch (err) {
-      console.error("Callback query xato:", err);
-      await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
-      return;
-    }
-  }
-
   if (chatId !== ADMIN_CHAT_ID) {
     await bot.answerCallbackQuery(query.id, { text: "Ruxsat yo'q." });
     return;
@@ -596,12 +554,16 @@ bot.on("callback_query", async (query) => {
   await bot.answerCallbackQuery(query.id).catch(() => {});
 });
 
+// Seller approve/reject tugmalari
 bot.on("callback_query", async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
 
   if (data.startsWith("approve_")) {
-    const pendingId = data.split("_")[1];
+    // pendingId ni to‘liq olish
+    const [action, ...idParts] = data.split("_");
+    const pendingId = idParts.join("_");
+    console.log("Approve pendingId:", pendingId); //
 
     // Sellerdan manzil so‘rash
     sellerAddressMap[chatId] = { pendingId, step: "waiting_address" };
@@ -612,7 +574,8 @@ bot.on("callback_query", async (query) => {
   }
 
   if (data.startsWith("reject_")) {
-    const pendingId = data.split("_")[1];
+    const [action, ...idParts] = data.split("_");
+    const pendingId = idParts.join("_");
     try {
       await axios.delete(`${process.env.API_URL}/pending/delete/${pendingId}`, {
         headers: { Authorization: `Bearer ${process.env.SELLER_TOKEN}` },
@@ -623,6 +586,8 @@ bot.on("callback_query", async (query) => {
       await bot.sendMessage(chatId, "Bekor qilishda xatolik yuz berdi.");
     }
   }
+
+  await bot.answerCallbackQuery(query.id);
 });
 
 // Seller manzil yuborganda
@@ -638,11 +603,10 @@ bot.on("message", async (msg) => {
 
     try {
       await axios.post(
-        `${process.env.API_URL}/delivery/add/${pendingId}`,
-        { address: text },
-        {
-          headers: { Authorization: `Bearer ${process.env.SELLER_TOKEN}` },
-        }
+        `${
+          process.env.API_URL
+        }/delivery/products/add/${pendingId}/${encodeURIComponent(text)}`,
+        { sellerBot: true }
       );
 
       await bot.sendMessage(
