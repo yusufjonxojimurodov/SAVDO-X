@@ -13,7 +13,10 @@ const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
 
 require("dotenv").config();
-require("./bot/index.js")(app);
+const { bot, setupWebhook } = require("./bot/index.js");
+
+// Bot webhookni sozlash
+setupWebhook(app);
 
 app.use(
   cors({

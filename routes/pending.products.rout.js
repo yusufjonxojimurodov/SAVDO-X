@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const BasketProduct = require("../models/basketProduct.js");
 const PendingProduct = require("../models/pending.products.js");
 const ProductModel = require("../models/products.js");
-const bot = require("../bot/index.js");
+const { bot } = require("../bot/index.js");
 const axios = require("axios");
 
 const tokenCheck = (req, res, next) => {
@@ -37,7 +37,7 @@ router.post("/add", tokenCheck, async (req, res) => {
 
       const basketItem = await BasketProduct.findById(productId).populate({
         path: "product",
-        populate: { path: "createdBy" }, 
+        populate: { path: "createdBy", select: "chatId userName" },
       });
 
       if (!basketItem) {
