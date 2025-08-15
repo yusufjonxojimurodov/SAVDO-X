@@ -560,10 +560,8 @@ bot.on("callback_query", async (query) => {
   const data = query.data;
 
   if (data.startsWith("approve_")) {
-    // pendingId ni to‘liq olish
     const [action, ...idParts] = data.split("_");
     const pendingId = idParts.join("_");
-    console.log("Approve pendingId:", pendingId); //
 
     // Sellerdan manzil so‘rash
     sellerAddressMap[chatId] = { pendingId, step: "waiting_address" };
@@ -576,38 +574,48 @@ bot.on("callback_query", async (query) => {
   if (data.startsWith("reject_")) {
     const [action, ...idParts] = data.split("_");
     const pendingId = idParts.join("_");
-    try {
-      await axios.delete(`${process.env.API_URL}/pending/delete/${pendingId}`, {
-        headers: { Authorization: `Bearer ${process.env.SELLER_TOKEN}` },
-      });
-      await bot.sendMessage(chatId, "❌ Buyurtma bekor qilindi.");
-    } catch (err) {
-      console.error(err.message);
-      await bot.sendMessage(chatId, "Bekor qilishda xatolik yuz berdi.");
-    }
+
+    // Reject sababini olish uchun step qo‘yish
+    sellerAddressMap[chatId] = { pendingId, step: "waiting_reject_reason" };
+    await bot.sendMessage(
+      chatId,
+      "❌ Buyurtmani bekor qilish sababini yozing:"
+    );
   }
 
   await bot.answerCallbackQuery(query.id);
 });
 
-// Seller manzil yuborganda
+// Seller manzil yoki reject sabab yuborganda
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
 
-  if (
-    sellerAddressMap[chatId] &&
-    sellerAddressMap[chatId].step === "waiting_address"
-  ) {
-    const { pendingId } = sellerAddressMap[chatId];
+  if (!sellerAddressMap[chatId]) return;
 
+  const { pendingId, step } = sellerAddressMap[chatId];
+
+  // === Tasdiqlash holati ===
+  if (step === "waiting_address") {
     try {
-      await axios.post(
+      // DB ga delivery qo'shish
+      const res = await axios.post(
         `${
           process.env.API_URL
         }/delivery/products/add/${pendingId}/${encodeURIComponent(text)}`,
         { sellerBot: true }
       );
+
+      // PendingProduct-ni topib mijoz chatId olish
+      const pending = res.data.delivery; // yoki PendingProduct info kerak bo‘lsa fetch qilamiz
+      const buyerChatId = pending.buyerId.chatId; // DB-da buyer chatId saqlangan bo‘lsa
+
+      if (buyerChatId) {
+        await bot.sendMessage(
+          buyerChatId,
+          `🚚 Mahsulotingiz "${pending.name}" tasdiqlandi va 24 soat ichida yetkazib beriladi.`
+        );
+      }
 
       await bot.sendMessage(
         chatId,
@@ -617,9 +625,42 @@ bot.on("message", async (msg) => {
       console.error(err.message);
       await bot.sendMessage(chatId, "Manzilni saqlashda xatolik yuz berdi.");
     }
-
-    delete sellerAddressMap[chatId];
   }
+
+  // === Bekor qilish holati ===
+  if (step === "waiting_reject_reason") {
+    try {
+      // PendingProduct info olish
+      const pendingRes = await axios.get(
+        `${process.env.API_URL}/pending/products/${pendingId}`
+      );
+      const pending = pendingRes.data;
+      const buyerChatId = pending.buyer.chatId;
+
+      // Mijozga xabar yuborish
+      if (buyerChatId) {
+        await bot.sendMessage(
+          buyerChatId,
+          `❌ Mahsulotingiz "${pending.name}" bekor qilindi.\nSabab: ${text}`
+        );
+      }
+
+      // PendingProduct DB-dan o'chirish
+      await axios.delete(
+        `${process.env.API_URL}/pending/products/delete/${pendingId}`
+      );
+
+      await bot.sendMessage(
+        chatId,
+        "Buyurtma bekor qilindi va mijozga xabar yuborildi."
+      );
+    } catch (err) {
+      console.error(err.message);
+      await bot.sendMessage(chatId, "Bekor qilishda xatolik yuz berdi.");
+    }
+  }
+
+  delete sellerAddressMap[chatId];
 });
 
 console.log("Telegram bot webhook sozlandi ✅");
