@@ -159,5 +159,55 @@ module.exports = (app) => {
     // Masalan: "Adminga bog‘lanish📲" ni qayta ishlash
   });
 
+  // bot/index.js (callbackQuery handler qo'shish)
+  bot.on("callback_query", async (query) => {
+    const chatId = query.message.chat.id;
+    const data = query.data; // approve_<id> yoki reject_<id>
+    const [action, pendingId] = data.split("_");
+
+    try {
+      const pending = await PendingProduct.findById(pendingId)
+        .populate("buyer")
+        .populate("product");
+      if (!pending) {
+        return bot.answerCallbackQuery(query.id, {
+          text: "Pending product topilmadi",
+        });
+      }
+
+      if (action === "approve") {
+        await bot.editMessageText(`Mahsulot "${pending.name}" tasdiqlandi ✅`, {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+        });
+
+        await bot.sendMessage(
+          pending.buyer.chatId,
+          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" tasdiqlandi!`
+        );
+      } else if (action === "reject") {
+        await PendingProduct.findByIdAndDelete(pendingId);
+
+        await bot.editMessageText(
+          `Mahsulot "${pending.name}" bekor qilindi ❌`,
+          {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+          }
+        );
+
+        await bot.sendMessage(
+          pending.buyer.chatId,
+          `Siz sotib olmoqchi bo‘lgan mahsulot "${pending.name}" sotuvchi tomonidan bekor qilindi.`
+        );
+      }
+
+      bot.answerCallbackQuery(query.id); // tugmani bosishni yakunlash
+    } catch (err) {
+      console.error(err);
+      bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi" });
+    }
+  });
+
   console.log("Telegram bot webhook sozlandi ✅");
 };

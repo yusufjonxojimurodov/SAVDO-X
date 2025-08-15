@@ -18,6 +18,7 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
+// pending.products.js (router)
 router.post("/add", tokenCheck, async (req, res) => {
   try {
     const { orders, phone } = req.body;
@@ -58,13 +59,28 @@ router.post("/add", tokenCheck, async (req, res) => {
       await pending.save();
       pendingProducts.push(pending);
 
+      // BOT ga sellerga xabar yuborish
       try {
-        await axios.post("http://localhost:5000/new-order", {
-          sellerChatId: pending.createdBy.chatId,
-          buyerName: req.userId,
-          productName: basketItem.product.name,
-          quantity: quantity || basketItem.quantity,
-        });
+        await bot.sendMessage(
+          basketItem.product.createdBy.chatId,
+          `Sizning mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: "Tasdiqlash ✅",
+                    callback_data: `approve_${pending._id}`,
+                  },
+                  {
+                    text: "Bekor qilish ❌",
+                    callback_data: `reject_${pending._id}`,
+                  },
+                ],
+              ],
+            },
+          }
+        );
       } catch (err) {
         console.error("Botga xabar yuborilmadi:", err.message);
       }
