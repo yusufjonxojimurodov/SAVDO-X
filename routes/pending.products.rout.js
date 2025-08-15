@@ -7,12 +7,18 @@ const ProductModel = require("../models/products.js");
 const { bot } = require("../bot/index.js");
 const axios = require("axios");
 
-const tokenCheck = (req, res, next) => {
+const tokenCheck = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Token topilmadi" });
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_TOKEN);
     req.userId = decoded.id;
+
+    // User modeldan username olish
+    const user = await User.findById(req.userId);
+    req.userName = user?.userName || "Anonim";
+
     next();
   } catch (err) {
     return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
@@ -62,12 +68,9 @@ router.post("/add", tokenCheck, async (req, res) => {
 
       // BOT ga sellerga xabar yuborish
       try {
-        const buyerUser = (await basketItem.product.buyer?.userName) || "Mijoz";
         await bot.sendMessage(
           basketItem.product.createdBy.chatId,
-          `Sizning mahsulotingiz "${
-            basketItem.product.name
-          }" tasdiqlanishi kutilmoqda.\nMijoz: ${req.userName || "Anonim"}`,
+          `Sizning mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.\nMijoz: ${req.userName}`,
           {
             reply_markup: {
               inline_keyboard: [
