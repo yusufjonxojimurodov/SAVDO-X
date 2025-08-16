@@ -516,14 +516,12 @@ bot.on("callback_query", async (query) => {
     }
 
     if (action === "admin_approve") {
-      // Admin javob yozishi kerak
       adminStates[chatId] = { type: "waitingAdminReply", requestId };
       await bot.sendMessage(
         chatId,
         "Xabaringizni yozing (foydalanuvchiga yuboriladi):"
       );
     } else {
-      // Bekor qilish
       await bot.sendMessage(
         req.userChatId,
         "Sizning murojaatingiz bekor qilindi ❌"
@@ -554,41 +552,59 @@ bot.on("callback_query", async (query) => {
   await bot.answerCallbackQuery(query.id).catch(() => {});
 });
 
-// Seller approve/reject tugmalari
 bot.on("callback_query", async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
 
-  if (data.startsWith("approve_")) {
-    // pendingId ni to‘liq olish
-    const [action, ...idParts] = data.split("_");
-    const pendingId = idParts.join("_");
-    console.log("Approve pendingId:", pendingId);
+  try {
+    if (data.startsWith("approve_")) {
+      const [action, ...idParts] = data.split("_");
+      const pendingId = idParts.join("_").trim();
 
-    // Sellerdan manzil so‘rash
-    sellerAddressMap[chatId] = { pendingId, step: "waiting_address" };
+      sellerAddressMap[chatId] = { pendingId, step: "waiting_address" };
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+        }
+      );
+
+      await bot.sendMessage(
+        chatId,
+        "✅ Buyurtma tasdiqlandi.\n📍 Iltimos, mijoz manzilini kiriting:"
+      );
+    }
+
+    if (data.startsWith("reject_")) {
+      const [action, ...idParts] = data.split("_");
+      const pendingId = idParts.join("_").trim();
+
+      sellerAddressMap[chatId] = { pendingId, step: "waiting_cancel_reason" };
+
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
+        {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+        }
+      );
+
+      await bot.sendMessage(
+        chatId,
+        "❌ Buyurtma bekor qilinmoqda. Iltimos, bekor qilish sababini kiriting:"
+      );
+
+    }
+  } catch (err) {
+    console.error("Callback xatolik:", err.message);
     await bot.sendMessage(
       chatId,
-      "✅ Buyurtma tasdiqlandi.\n📍 Iltimos, mijoz manzilini kiriting:"
+      "⚠️ Xatolik yuz berdi. Keyinroq urinib ko‘ring."
     );
   }
-
-  if (data.startsWith("reject_")) {
-    const [action, ...idParts] = data.split("_");
-    const pendingId = idParts.join("_");
-
-    // Sellerdan bekor qilish sababini so‘rash
-    sellerAddressMap[chatId] = { pendingId, step: "waiting_reject_reason" };
-    await bot.sendMessage(
-      chatId,
-      "❌ Buyurtmani bekor qilish sababini yozing:"
-    );
-  }
-
-  await bot.answerCallbackQuery(query.id);
 });
 
-// Seller manzil yoki reject sabab yuborganda
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -597,10 +613,13 @@ bot.on("message", async (msg) => {
 
   const { pendingId, step } = sellerAddressMap[chatId];
 
-  // Approve holat: manzil kiritildi
   if (step === "waiting_address") {
     try {
-      // DeliveryProduct yaratish va PendingProduct o'chirish
+      const pendingOrderResponse = await axios.get(
+        `${process.env.API_URL}/pending/products/pending/products/${pendingId}`
+      );
+      const customerChatId = pendingOrderResponse.data.customerChatId;
+
       await axios.post(
         `${
           process.env.API_URL
@@ -608,69 +627,65 @@ bot.on("message", async (msg) => {
         { sellerBot: true }
       );
 
-      // PendingProduct ma’lumotlarini olish (mijoz chatId va productName)
-      const pendingRes = await axios.get(
-        `${process.env.API_URL}/pending/products/${pendingId}`
-      );
-      const pending = pendingRes.data;
-      const buyerChatId = pending.buyer.chatId;
-      const productName = pending.name;
-
-      // Mijozga xabar yuborish
-      if (buyerChatId) {
-        await bot.sendMessage(
-          buyerChatId,
-          `🚚 Mahsulotingiz "${productName}" tasdiqlandi va 24 soat ichida yetkazib beriladi.`
-        );
-      }
-
       await bot.sendMessage(
         chatId,
         "🚚 Mahsulot yetkazish jarayoniga o‘tkazildi!"
       );
+
+      if (customerChatId) {
+        await bot.sendMessage(
+          customerChatId,
+          `🚚 Sizning buyurtmangiz yetkazish jarayoniga o‘tkazildi!`
+        );
+      } else {
+        console.error("❌ Customer chatId topilmadi!");
+      }
     } catch (err) {
-      console.error(err.message);
-      await bot.sendMessage(chatId, "Manzilni saqlashda xatolik yuz berdi.");
+      bot.sendMessage(
+        chatId,
+        "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌"
+      );
+      console.error(
+        "❌ Approve qadamida xato:",
+        err.response?.data || err.message
+      );
     }
+
+    delete sellerAddressMap[chatId];
   }
 
-  // Reject holat: sabab yozildi
-  if (step === "waiting_reject_reason") {
+  if (step === "waiting_cancel_reason") {
     try {
-      // PendingProduct ma’lumotlarini olish
-      const pendingRes = await axios.get(
-        `${process.env.API_URL}/pending/products/${pendingId}`
+      const pendingOrderResponse = await axios.get(
+        `${process.env.API_URL}/pending/products/pending/products/${pendingId}?sellerBot=true`
       );
-      const pending = pendingRes.data;
-      const buyerChatId = pending.buyer.chatId;
-      const productName = pending.name;
+      const customerChatId = pendingOrderResponse.data.customerChatId;
 
-      // Mijozga xabar yuborish
-      if (buyerChatId) {
+      await bot.sendMessage(chatId, "❌ Buyurtma bekor qilindi!");
+
+      if (customerChatId) {
         await bot.sendMessage(
-          buyerChatId,
-          `❌ Mahsulotingiz "${productName}" bekor qilindi.\nSabab: ${text}`
+          customerChatId,
+          `❌ Sizning buyurtmangiz bekor qilindi. Sabab: ${text}`
         );
       }
 
-      // PendingProduct o'chirish
       await axios.delete(
-        `${process.env.API_URL}/pending/products/delete/${pendingId}`
-      );
-
-      await bot.sendMessage(
-        chatId,
-        "Buyurtma bekor qilindi va mijozga xabar yuborildi."
+        `${process.env.API_URL}/pending/products/delete/${pendingId}?sellerBot=true`
       );
     } catch (err) {
-      console.error(err.message);
-      await bot.sendMessage(chatId, "Bekor qilishda xatolik yuz berdi.");
+      bot.sendMessage(
+        chatId,
+        "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌"
+      );
+      console.error(
+        "❌ Cancel qadamida xato:",
+        err.response?.data || err.message
+      );
     }
+
+    delete sellerAddressMap[chatId];
   }
-
-  delete sellerAddressMap[chatId];
 });
-
-console.log("Telegram bot webhook sozlandi ✅");
 
 module.exports = { bot, setupWebhook };

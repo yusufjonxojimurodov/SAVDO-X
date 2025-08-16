@@ -131,35 +131,10 @@ router.post(
       }
 
       const inputPath = req.file.path;
-      const outputPath = `uploads/${Date.now()}-processed.png`;
 
-      // rasmni PNG formatiga o'tkazish va oq fonni olib tashlash
-      const image = sharp(inputPath).ensureAlpha();
-      const { data, info } = await image
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        // oq fon bo'lsa alpha = 0
-        if (r > 240 && g > 240 && b > 240) {
-          data[i + 3] = 0;
-        }
-      }
-
-      await sharp(data, {
-        raw: { width: info.width, height: info.height, channels: 4 },
-      })
-        .png()
-        .toFile(outputPath);
-
-      // base64ga o‘tkazish (agar kerak bo‘lsa)
-      const imageBuffer = fs.readFileSync(outputPath);
+      const imageBuffer = fs.readFileSync(inputPath);
       const imageBase64 = imageBuffer.toString("base64");
 
-      // IMGBB yoki boshqa hostingga yuborish (agar xohlansa)
       const formData = new FormData();
       formData.append("image", imageBase64);
 
@@ -169,10 +144,9 @@ router.post(
         { headers: formData.getHeaders() }
       );
 
-      fs.unlinkSync(inputPath); // temp faylni o'chirish
+      fs.unlinkSync(inputPath);
       const imageUrl = response.data.data.url;
 
-      // yangi product yaratish
       const newProduct = new ProductModel({
         name,
         description,
@@ -268,24 +242,13 @@ router.put(
           .json({ message: "Sizda bu mahsulotni tahrirlash huquqi yo‘q" });
       }
 
-      let imageUrl = product.image; // agar rasm o'zgarmasa eski link qoladi
+      let imageUrl = product.image; // agar yangi rasm yuborilmasa, eski rasm qoladi
 
       if (req.file) {
         const inputPath = req.file.path;
-        const outputPath = `uploads/${Date.now()}-no-bg.png`;
 
-        const result = await removeBackgroundFromImageFile({
-          path: inputPath,
-          apiKey: process.env.REMOVE_BG_API_KEY,
-          size: "auto",
-          type: "auto",
-        });
-
-        await sharp(Buffer.from(result.base64img, "base64"))
-          .png()
-          .toFile(outputPath);
-
-        const imageBuffer = fs.readFileSync(outputPath);
+        // imgbb uchun base64 qilish
+        const imageBuffer = fs.readFileSync(inputPath);
         const imageBase64 = imageBuffer.toString("base64");
 
         const formData = new FormData();
@@ -297,11 +260,11 @@ router.put(
           { headers: formData.getHeaders() }
         );
 
-        fs.unlinkSync(inputPath);
+        fs.unlinkSync(inputPath); // temp faylni o‘chirish
         imageUrl = response.data.data.url;
       }
 
-      // yangilash
+      // productni yangilash
       product.name = name ?? product.name;
       product.description = description ?? product.description;
       product.price = price ?? product.price;
@@ -318,7 +281,7 @@ router.put(
 
       res.json(updatedProduct);
     } catch (err) {
-      console.error(err);
+      console.error("PUT /my/product/edit error:", err.message);
       res.status(500).json({ message: "Server xatosi" });
     }
   }

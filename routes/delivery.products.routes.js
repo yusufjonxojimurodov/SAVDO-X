@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const DeliveryProduct = require("../models/delivery.products.models.js");
 const PendingProduct = require("../models/pending.products.js");
+const { bot } = require("../bot/index.js");
 const jwt = require("jsonwebtoken");
 
-// Token tekshiruvi middleware
 const tokenCheck = (req, res, next) => {
   if (!req.headers.authorization && req.body.sellerBot) {
     return next();
@@ -22,7 +22,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// PendingProduct _id va address orqali DeliveryProduct yaratish
 router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
   try {
     const { pendingId, address } = req.params;
@@ -31,17 +30,49 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
       return res.status(400).json({ message: "pendingId required" });
     if (!address) return res.status(400).json({ message: "address required" });
 
-    // PendingProduct _id bo‘yicha topish
-    const pending = await PendingProduct.findById(pendingId);
-    console.log(pending);
+    const pending = await PendingProduct.findById(pendingId)
+      .populate("product")
+      .populate("createdBy")
+      .populate("buyer");
+
     if (!pending)
       return res.status(404).json({ message: "PendingProduct topilmadi" });
 
-    // DeliveryProduct yaratish
+    const product = pending.product || {};
+    const seller = pending.createdBy || {};
+    const buyer = pending.buyer || {};
+
+    if (!product.left || product.left < pending.quantity) {
+      if (seller.chatId && !product._notified) {
+        await bot.sendMessage(
+          seller.chatId,
+          `⚠️ ${product.name} mahsulotingiz sotuvda qolmadi.\nAgar sizning omboringizda bo'lsa saytimizga kirib mahsulot qoldig'ini yangilang!`
+        );
+        product._notified = true;
+        await product.save();
+      }
+
+      await PendingProduct.findByIdAndDelete(pendingId);
+
+      if (buyer.chatId) {
+        await bot.sendMessage(
+          buyer.chatId,
+          `❌ Afsuski, siz buyurtma qilgan ${product.name} mahsuloti omborda qolmagan.`
+        );
+      }
+
+      return res.status(400).json({
+        message: "❌ Bu mahsulot sotuvda qolmagan",
+      });
+    }
+
     const newDelivery = new DeliveryProduct({
-      productId: pending.product,
-      sellerId: pending.createdBy,
-      buyerId: pending.buyer,
+      image: product.image || "",
+      name: product.name || "",
+      description: product.description || "",
+      productId: product._id,
+      sellerId: seller._id,
+      buyerId: buyer._id,
       quantity: pending.quantity,
       price: pending.price,
       address,
@@ -50,12 +81,99 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
 
     await newDelivery.save();
 
-    // PendingProduct o'chirish
+    product.left = product.left - pending.quantity;
+
+    if (product.left <= 0 && seller.chatId && !product._notified) {
+      await bot.sendMessage(
+        seller.chatId,
+        `⚠️ ${product.name} mahsulotingiz sotuvda qolmadi.\nAgar sizning omboringizda bo'lsa saytimizga kirib mahsulot qoldig'ini yangilang!`
+      );
+      product._notified = true;
+    }
+
+    await product.save();
+
     await PendingProduct.findByIdAndDelete(pendingId);
 
+    if (buyer.chatId) {
+      await bot.sendMessage(
+        buyer.chatId,
+        `✅ Sizning ${product.name} mahsulotingiz tasdiqlandi va tez orada yetkazib beriladi.`
+      );
+    }
+
     res.json({
-      message: "Mahsulot yetkazish jarayoniga o‘tkazildi",
+      message: "✅ Mahsulot yetkazish jarayoniga o‘tkazildi",
       delivery: newDelivery,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.get("/my-deliveries", tokenCheck, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const deliveries = await DeliveryProduct.find({ buyerId: userId })
+      .populate("sellerId", "userName phone")
+      .populate("productId", "name price image description");
+
+    res.json({
+      message: "✅ Sizning delivery products",
+      deliveries,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.get("/seller/deliveries", tokenCheck, async (req, res) => {
+  try {
+    const sellerId = req.userId;
+
+    const deliveries = await DeliveryProduct.find({ sellerId })
+      .populate("buyerId", "userName phone")
+      .populate("productId", "name price image description");
+
+    res.json({
+      message: "✅ Siz sotgan delivery products",
+      deliveries,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.put("/delivery/:id/status", tokenCheck, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["completed", "incompleted"].includes(status)) {
+      return res.status(400).json({ message: "❌ Noto‘g‘ri status qiymati" });
+    }
+
+    const delivery = await DeliveryProduct.findOne({
+      _id: id,
+      sellerId: req.userId,
+    });
+
+    if (!delivery) {
+      return res
+        .status(404)
+        .json({ message: "❌ Delivery topilmadi yoki sizga tegishli emas" });
+    }
+
+    delivery.status = status;
+    await delivery.save();
+
+    res.json({
+      message: "✅ Delivery status yangilandi",
+      delivery,
     });
   } catch (err) {
     console.error(err);

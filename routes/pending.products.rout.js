@@ -8,12 +8,16 @@ const { bot } = require("../bot/index.js");
 const axios = require("axios");
 
 const tokenCheck = (req, res, next) => {
+  if (req.query?.sellerBot === "true" || req.body?.sellerBot === true) {
+    return next();
+  }
+
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Token topilmadi" });
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_TOKEN);
     req.userId = decoded.id;
-
     next();
   } catch (err) {
     return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
@@ -57,6 +61,7 @@ router.post("/add", tokenCheck, async (req, res) => {
         buyer: req.userId,
         phone,
         userName: req.userName,
+        buyerChatId: req.body.buyerChatId,
       });
 
       await pending.save();
@@ -67,7 +72,9 @@ router.post("/add", tokenCheck, async (req, res) => {
           basketItem.product.createdBy.chatId,
           `Sizning mahsulotingiz "${
             basketItem.product.name
-          }" tasdiqlanishi kutilmoqda.⌚\nMijoz👤: ${userName ? '@'+userName : "Anonim"}\nMobil Raqam📞: ${phone}\nSotib olmoqchi🧺: ${quantity} ta`,
+          }" tasdiqlanishi kutilmoqda.⌚\nMijoz👤: ${
+            userName ? "@" + userName : "Anonim"
+          }\nMobil Raqam📞: ${phone}\nSotib olmoqchi🧺: ${quantity} ta`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -118,10 +125,10 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
 router.get("/my-pending/seller", tokenCheck, async (req, res) => {
   try {
     const pendingOrders = await PendingProduct.find({
-      createdBy: req.userId, 
+      createdBy: req.userId,
     })
       .populate("buyer", "name userName")
-      .populate("product"); 
+      .populate("product");
 
     res.json(pendingOrders);
   } catch (err) {
@@ -130,7 +137,7 @@ router.get("/my-pending/seller", tokenCheck, async (req, res) => {
   }
 });
 
-router.delete("/delete/:id", tokenCheck, async (req, res) => {
+router.delete("/delete/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -141,6 +148,28 @@ router.delete("/delete/:id", tokenCheck, async (req, res) => {
     }
 
     res.json({ message: "PendingProduct muvaffaqiyatli o‘chirildi", deleted });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.get("/pending/products/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pendingOrder = await PendingProduct.findById(id)
+      .populate("product", "name")
+      .populate("buyer", "userName");
+
+    if (!pendingOrder)
+      return res.status(404).json({ message: "Pending product topilmadi" });
+
+    res.json({
+      pendingId: pendingOrder._id,
+      customerChatId: pendingOrder.buyerChatId,
+      productName: pendingOrder.product?.name || "",
+      buyerName: pendingOrder.buyer?.userName || "",
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });
