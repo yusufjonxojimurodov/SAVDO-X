@@ -20,7 +20,7 @@ setupWebhook(app);
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://practicesavdox.netlify.app"],
+    origin: "*", // hamma domenlardan keladigan so‘rovlarni ruxsat qiladi
     allowedHeaders: ["Authorization", "Content-Type"],
     credentials: true,
   })
