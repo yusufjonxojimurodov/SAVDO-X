@@ -19,9 +19,21 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: [true, "Telefon modelini kiritish shart"],
     },
+    type: {
+      type: String,
+      required: [true, "Mahsulot turi kiritilishi shart !"],
+    },
     left: {
       type: Number,
-      required: [true, "Mahsulot qoldigini kiritish shart!"]
+      required: [true, "Mahsulot qoldigini kiritish shart!"],
+    },
+    discount: {
+      type: Number,
+      required: [false],
+      default: 0,
+    },
+    discountPrice: {
+      type: Number
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

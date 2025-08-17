@@ -75,6 +75,8 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
       buyerId: buyer._id,
       quantity: pending.quantity,
       price: pending.price,
+      discount: pending.discount,
+      discountPrice: pending.discountPrice,
       address,
       status: "pending",
     });
@@ -118,7 +120,7 @@ router.get("/my-deliveries", tokenCheck, async (req, res) => {
 
     const deliveries = await DeliveryProduct.find({ buyerId: userId })
       .populate("sellerId", "userName phone")
-      .populate("productId", "name price image description");
+      .populate("productId", "name price image description discount discountPrice");
 
     res.json({
       message: "✅ Sizning delivery products",
@@ -136,7 +138,7 @@ router.get("/seller/deliveries", tokenCheck, async (req, res) => {
 
     const deliveries = await DeliveryProduct.find({ sellerId })
       .populate("buyerId", "userName phone")
-      .populate("productId", "name price image description");
+      .populate("productId", "name price image description discount discountPrice");
 
     res.json({
       message: "✅ Siz sotgan delivery products",

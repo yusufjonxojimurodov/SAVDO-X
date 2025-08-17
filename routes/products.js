@@ -27,12 +27,24 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
+const formatProduct = (product) => {
+  const obj = product.toObject ? product.toObject() : product;
+  if (obj.discount) {
+    obj.discountPrice = obj.price - (obj.price * obj.discount) / 100;
+  }
+  return obj;
+};
+
 router.get("/", async (req, res) => {
   try {
     const filter = {};
 
     if (req.query.model) {
       filter.model = req.query.model;
+    }
+
+    if (req.query.type) {
+      filter.type = req.query.type;
     }
 
     if (req.query.search) {
@@ -75,7 +87,7 @@ router.get("/", async (req, res) => {
         }
 
         return {
-          ...product.toObject(),
+          ...formatProduct(product),
           rating: {
             happy: happyPercent,
             unhappy: unhappyPercent,
@@ -109,7 +121,7 @@ router.get(
 
       const myProducts = await ProductModel.find(filter);
 
-      res.json(myProducts);
+      res.json(myProducts.map(formatProduct));
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Server xatosi" });
@@ -124,7 +136,8 @@ router.post(
   upload.single("image"),
   async (req, res) => {
     try {
-      const { name, description, price, left, model } = req.body;
+      const { name, description, price, left, type, discount, model } =
+        req.body;
 
       if (!req.file) {
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
@@ -146,12 +159,16 @@ router.post(
 
       fs.unlinkSync(inputPath);
       const imageUrl = response.data.data.url;
+      const discountPrice = discount ? price - (price * discount) / 100 : price;
 
       const newProduct = new ProductModel({
         name,
         description,
         price,
         model,
+        type,
+        discount,
+        discountPrice,
         left,
         createdBy: req.userId,
         image: imageUrl,
@@ -162,7 +179,7 @@ router.post(
         newProduct._id
       ).populate("createdBy", "userName");
 
-      res.status(201).json(populatedProduct);
+      res.status(201).json(formatProduct(populatedProduct));
     } catch (err) {
       console.error("Xatolik:", err);
       res.status(500).json({ message: "Server xatosi" });
@@ -181,7 +198,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Mahsulot topilmadi" });
     }
 
-    res.json(product);
+    res.json(formatProduct(product));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });
@@ -242,12 +259,11 @@ router.put(
           .json({ message: "Sizda bu mahsulotni tahrirlash huquqi yo‘q" });
       }
 
-      let imageUrl = product.image; // agar yangi rasm yuborilmasa, eski rasm qoladi
+      let imageUrl = product.image;
 
       if (req.file) {
         const inputPath = req.file.path;
 
-        // imgbb uchun base64 qilish
         const imageBuffer = fs.readFileSync(inputPath);
         const imageBase64 = imageBuffer.toString("base64");
 
@@ -260,17 +276,20 @@ router.put(
           { headers: formData.getHeaders() }
         );
 
-        fs.unlinkSync(inputPath); // temp faylni o‘chirish
+        fs.unlinkSync(inputPath);
         imageUrl = response.data.data.url;
       }
 
-      // productni yangilash
       product.name = name ?? product.name;
       product.description = description ?? product.description;
       product.price = price ?? product.price;
       product.left = left ?? product.left;
       product.model = model ?? product.model;
       product.image = imageUrl;
+      product.discount = discount ?? product.discount;
+      product.discountPrice = product.discount
+        ? product.price - (product.price * product.discount) / 100
+        : product.price;
 
       await product.save();
 
@@ -279,7 +298,7 @@ router.put(
         "userName"
       );
 
-      res.json(updatedProduct);
+      res.json(formatProduct(updatedProduct));
     } catch (err) {
       console.error("PUT /my/product/edit error:", err.message);
       res.status(500).json({ message: "Server xatosi" });
