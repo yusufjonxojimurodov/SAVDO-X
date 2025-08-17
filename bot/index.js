@@ -643,7 +643,7 @@ bot.on("message", async (msg) => {
     } catch (err) {
       bot.sendMessage(
         chatId,
-        "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌"
+        "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌ yoki adminga murojaatga chiqing👨‍💻"
       );
       console.log(
         "❌ Approve qadamida xato:",
@@ -676,7 +676,7 @@ bot.on("message", async (msg) => {
     } catch (err) {
       bot.sendMessage(
         chatId,
-        "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌"
+        "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌ yoki adminga murojaatga chiqing👨‍💻"
       );
       console.log(
         "❌ Cancel qadamida xato:",
