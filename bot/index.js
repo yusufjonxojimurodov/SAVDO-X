@@ -645,7 +645,7 @@ bot.on("message", async (msg) => {
         chatId,
         "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌"
       );
-      console.error(
+      console.log(
         "❌ Approve qadamida xato:",
         err.response?.data || err.message
       );
@@ -678,7 +678,7 @@ bot.on("message", async (msg) => {
         chatId,
         "Mahsulot Savdo X saytidagi operatorlaringiz tomonidan Tasdiqlangan✅ yoki Bekor qilingan❌"
       );
-      console.error(
+      console.log(
         "❌ Cancel qadamida xato:",
         err.response?.data || err.message
       );
