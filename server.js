@@ -12,6 +12,7 @@ const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
 const deliveryProducts = require("./routes/delivery.products.routes.js");
+const bannersRoutes = require("./routes/banners.routes.js")
 
 require("dotenv").config();
 const { bot, setupWebhook } = require("./bot/index.js");
@@ -20,7 +21,7 @@ setupWebhook(app);
 
 app.use(
   cors({
-    origin: "*", // hamma domenlardan keladigan so‘rovlarni ruxsat qiladi
+    origin: "*",
     allowedHeaders: ["Authorization", "Content-Type"],
     credentials: true,
   })
@@ -34,6 +35,7 @@ app.use("/api/comments", commentRouter);
 app.use(avatarRouter);
 app.use("/pending/products", pendingRoutes);
 app.use("/delivery/products", deliveryProducts);
+app.use("/banner", bannersRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI, {
