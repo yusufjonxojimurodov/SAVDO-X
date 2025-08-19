@@ -45,10 +45,27 @@ router.post("/add", tokenCheck, async (req, res) => {
 
 router.get("/", tokenCheck, async (req, res) => {
   try {
-    const basket = await BasketProduct.find({ user: req.userId }).populate(
-      "product"
-    );
-    res.json(basket);
+    const { search } = req.query;
+
+    let filter = { user: req.userId };
+
+    if (search) {
+      filter = {
+        ...filter,
+      };
+    }
+
+    const basket = await BasketProduct.find(filter)
+      .populate({
+        path: "product",
+        match: search
+          ? { name: { $regex: search, $options: "i" } }
+          : {},
+      });
+
+    const filteredBasket = basket.filter((b) => b.product !== null);
+
+    res.json(filteredBasket);
   } catch (err) {
     res.status(500).json({ message: "Server xatosi" });
   }
