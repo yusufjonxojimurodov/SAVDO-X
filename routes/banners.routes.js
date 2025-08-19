@@ -25,7 +25,7 @@ const tokenCheck = (req, res, next) => {
 
 // POST /banners
 router.post(
-  "/banners",
+  "/post",
   tokenCheck,
   permission(["admin"]),
   upload.single("image"),
@@ -74,7 +74,7 @@ router.post(
 );
 
 // GET /banners
-router.get("/banners", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const banners = await Banner.find().populate("createdBy", "userName");
     res.json(banners);

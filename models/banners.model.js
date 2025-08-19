@@ -1,5 +1,4 @@
-// models/Banner.model.js
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const bannerSchema = new mongoose.Schema(
   {
@@ -9,4 +8,4 @@ const bannerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Banner", bannerSchema);
+module.exports = mongoose.model("Banner", bannerSchema);
