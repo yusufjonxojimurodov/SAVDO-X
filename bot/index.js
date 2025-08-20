@@ -288,7 +288,6 @@ function sendToAdminWithApproveReject({ type, userChatId, username, payload }) {
     (payload.extra ? `\n${payload.extra}` : "");
 
   bot.sendMessage(ADMIN_CHAT_ID, text, {
-    parse_mode: "Markdown",
     reply_markup: {
       inline_keyboard: [
         [
