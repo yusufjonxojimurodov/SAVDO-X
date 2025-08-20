@@ -2,15 +2,23 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const bodyParser = require("body-parser");
 const User = require("../models/userRegister.js");
+const mongoose = require("mongoose");
 const PendingProduct = require("../models/pending.products.js");
+const axios = require("axios");
+
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
 const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID || 0);
-const axios = require("axios");
+const mongoUri = process.env.MONGO_URI;
 
 if (!token) console.error("BOT_TOKEN topilmadi!");
 if (!URL) console.error("URL topilmadi!");
 if (!ADMIN_CHAT_ID) console.error("ADMIN_CHAT_ID topilmadi yoki noto'g'ri!");
+
+mongoose
+  .connect(mongoUri)
+  .then(() => console.log("✅ MongoDB ulandi"))
+  .catch((err) => console.error("❌ MongoDB xatolik:", err));
 
 const bot = new TelegramBot(token, { webHook: true });
 bot.setWebHook(`${URL}/bot${token}`);
@@ -37,6 +45,7 @@ function setupWebhook(app) {
   });
 }
 
+const userSteps = {};
 const userStates = {};
 const adminStates = {};
 const pendingMap = {};
@@ -102,37 +111,28 @@ bot.onText(/\/start/, async (msg) => {
   if (!username) {
     bot.sendMessage(
       chatId,
-      "Sizning Telegram username topilmadi. Iltimos, Telegram sozlamalaridan username o‘rnatib qayta /start yuboring."
+      "❌ Username topilmadi. Telegram sozlamalaridan username qo‘ying va qayta /start yuboring."
     );
     return;
   }
 
-  try {
-    let user = await User.findOne({ userName: username });
+  let user = await User.findOne({ userName: username });
 
-    if (user && user.phone) {
-      if (user.chatId !== chatId) {
-        user.chatId = chatId;
-        await user.save();
-      }
-      if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
-      else sendMainMenu(chatId, username);
-      return;
-    }
-
-    bot.sendMessage(chatId, "Iltimos, telefon raqamingizni yuboring:", {
-      reply_markup: {
-        keyboard: [
-          [{ text: "Telefon raqamni yuborish", request_contact: true }],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
-  } catch (err) {
-    console.error("START xato:", err);
-    bot.sendMessage(chatId, "Xatolik yuz berdi.");
+  if (user && user.phone) {
+    bot.sendMessage(chatId, "✅ Siz allaqachon ro‘yxatdan o‘tgansiz!");
+    return;
   }
+
+  // Telefon so‘rash
+  bot.sendMessage(chatId, "📱 Telefon raqamingizni yuboring:", {
+    reply_markup: {
+      keyboard: [
+        [{ text: "📲 Telefon raqamni yuborish", request_contact: true }],
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    },
+  });
 });
 
 bot.on("contact", async (msg) => {
@@ -143,32 +143,55 @@ bot.on("contact", async (msg) => {
   if (!username) {
     bot.sendMessage(
       chatId,
-      "Username topilmadi, botni username bilan ishlating."
+      "❌ Username topilmadi. Botni username bilan ishlating."
     );
     return;
   }
 
-  try {
-    let user = await User.findOne({ userName: username });
-    if (!user) {
-      user = new User({ userName: username, chatId, phone });
-      await user.save();
-      bot.sendMessage(
-        chatId,
-        "Telefon raqamingiz va username muvaffaqiyatli saqlandi ✅"
-      );
-    } else {
-      user.chatId = chatId;
-      user.phone = phone;
-      await user.save();
-      bot.sendMessage(chatId, "Telefon raqamingiz yangilandi ✅");
-    }
+  let user = await User.findOne({ userName: username });
 
-    if (chatId === ADMIN_CHAT_ID) sendAdminMenu(chatId);
-    else sendMainMenu(chatId, username);
-  } catch (err) {
-    console.error("Foydalanuvchi saqlanmadi:", err);
-    bot.sendMessage(chatId, `Xatolik yuz berdi: ${err.message}`);
+  if (!user) {
+    user = new User({ userName: username, chatId, phone });
+    await user.save();
+  } else {
+    user.chatId = chatId;
+    user.phone = phone;
+    await user.save();
+  }
+
+  bot.sendMessage(chatId, "👤 Ismingizni yozing:");
+  userSteps[chatId] = "askName";
+});
+
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+  const step = userSteps[chatId];
+
+  if (!step) return; 
+
+  let user = await User.findOne({ chatId });
+  if (!user) return;
+
+  if (step === "askName") {
+    user.name = text;
+    await user.save();
+    bot.sendMessage(chatId, "👤 Familiyangizni yozing:");
+    userSteps[chatId] = "askSurname";
+  } else if (step === "askSurname") {
+    user.surname = text;
+    await user.save();
+    bot.sendMessage(chatId, "🔑 Parol kiriting (saytga kirish uchun):");
+    userSteps[chatId] = "askPassword";
+  } else if (step === "askPassword") {
+    user.password = text; 
+    user.role = "customer";
+    await user.save();
+    bot.sendMessage(
+      chatId,
+      "✅ Siz to‘liq ro‘yxatdan o‘tdingiz!\nEndi saytga telefon raqamingiz va parol bilan kira olasiz."
+    );
+    delete userSteps[chatId];
   }
 });
 
@@ -594,7 +617,6 @@ bot.on("callback_query", async (query) => {
         chatId,
         "❌ Buyurtma bekor qilinmoqda. Iltimos, bekor qilish sababini kiriting:"
       );
-
     }
   } catch (err) {
     console.error("Callback xatolik:", err.message);
