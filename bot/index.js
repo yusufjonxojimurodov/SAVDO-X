@@ -57,6 +57,7 @@ const USER_MENU = {
     ["Saytdagi Muammolar🐞"],
     ["Saytimizga takliflar📃"],
     ["Savdo X saytida mahsulot sotish🛒"],
+    ["Ma'lumotlarni yangilash📝"],
   ],
   resize_keyboard: true,
   one_time_keyboard: false,
@@ -70,6 +71,7 @@ const ADMIN_MENU = {
     ["Saytimizga takliflar📃"],
     ["Savdo X saytida mahsulot sotish🛒"],
     ["Foydalanuvchilar ro'yxati"],
+    ["Ma'lumotlarni yangilash📝"],
   ],
   resize_keyboard: true,
   one_time_keyboard: false,
@@ -123,7 +125,6 @@ bot.onText(/\/start/, async (msg) => {
     return;
   }
 
-  // Telefon so‘rash
   bot.sendMessage(chatId, "📱 Telefon raqamingizni yuboring:", {
     reply_markup: {
       keyboard: [
@@ -168,7 +169,7 @@ bot.on("message", async (msg) => {
   const text = msg.text;
   const step = userSteps[chatId];
 
-  if (!step) return; 
+  if (!step) return;
 
   let user = await User.findOne({ chatId });
   if (!user) return;
@@ -184,7 +185,7 @@ bot.on("message", async (msg) => {
     bot.sendMessage(chatId, "🔑 Parol kiriting (saytga kirish uchun):");
     userSteps[chatId] = "askPassword";
   } else if (step === "askPassword") {
-    user.password = text; 
+    user.password = text;
     user.role = "customer";
     await user.save();
     bot.sendMessage(
@@ -453,6 +454,52 @@ bot.on("message", async (msg) => {
       "Taklifingiz adminlarga yuborildi. Javobni kuting ✅"
     );
     delete userStates[chatId];
+    return;
+  }
+});
+
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text?.trim();
+  const username = msg.from.username;
+
+  let user = await User.findOne({ chatId });
+  if (!user) return;
+
+  if (text === "Ma'lumotlarni yangilash📝") {
+    userStates[chatId] = { type: "update_info" };
+    await bot.sendMessage(chatId, "📱 Telefon raqamingizni yuboring:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "📲 Telefon raqamni yuborish", request_contact: true }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+    return;
+  }
+
+  if (msg.contact && userStates[chatId]?.type === "update_info") {
+    user.phone = msg.contact.phone_number;
+    await user.save();
+    userStates[chatId].type = "update_password";
+    await bot.sendMessage(chatId, "🔑 Yangi parol kiriting:");
+    return;
+  }
+
+  if (userStates[chatId]?.type === "update_password") {
+    user.password = text;
+    await user.save();
+    delete userStates[chatId];
+
+    await bot.sendMessage(
+      chatId,
+      "✅ Telefon raqam va parolingiz muvaffaqiyatli yangilandi!"
+    );
+
+    if (user.role === "admin") sendAdminMenu(chatId);
+    else sendMainMenu(chatId, username);
     return;
   }
 });
