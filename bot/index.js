@@ -118,13 +118,20 @@ bot.onText(/\/start/, async (msg) => {
     return;
   }
 
-  let user = await User.findOne({ userName: username });
+  // Telefon raqam bilan birga bazada userni topamiz
+  let user = await User.findOne({
+    $or: [{ chatId }, { phone: msg.contact?.phone_number }],
+  });
 
-  if (user && user.phone) {
+  if (user) {
+    // Agar foydalanuvchi bazada bo‘lsa
     bot.sendMessage(chatId, "✅ Siz allaqachon ro‘yxatdan o‘tgansiz!");
+    if (user.role === "admin") sendAdminMenu(chatId);
+    else sendMainMenu(chatId, username);
     return;
   }
 
+  // Bazada user topilmadi => ro‘yxatdan o‘tish flow
   bot.sendMessage(chatId, "📱 Telefon raqamingizni yuboring:", {
     reply_markup: {
       keyboard: [
@@ -134,6 +141,46 @@ bot.onText(/\/start/, async (msg) => {
       one_time_keyboard: true,
     },
   });
+});
+
+bot.on("contact", async (msg) => {
+  const chatId = msg.chat.id;
+  const phone = msg.contact?.phone_number;
+  const username = msg.from.username;
+
+  if (!username) {
+    bot.sendMessage(
+      chatId,
+      "❌ Username topilmadi. Botni username bilan ishlating."
+    );
+    return;
+  }
+
+  // Telefon raqam bazada mavjudligini tekshiramiz
+  let existingUser = await User.findOne({ phone });
+
+  if (existingUser && existingUser.chatId !== chatId) {
+    // Agar telefon raqam bazada boshqa chatId bilan bo‘lsa
+    return bot.sendMessage(
+      chatId,
+      "❌ Ushbu telefon raqam bazada allaqachon ro‘yxatdan o‘tgan!"
+    );
+  }
+
+  // Bazada user topilsa, update flow
+  let user = await User.findOne({ chatId });
+  if (!user) {
+    user = new User({ userName: username, chatId, phone });
+    await user.save();
+  } else {
+    // Telefon raqamni yangilash
+    user.phone = phone;
+    await user.save();
+  }
+
+  // Parol kiritish
+  bot.sendMessage(chatId, "🔑 Yangi parol kiriting:");
+  userSteps[chatId] = "askPasswordUpdate";
 });
 
 bot.on("contact", async (msg) => {
@@ -193,6 +240,31 @@ bot.on("message", async (msg) => {
       "✅ Siz to‘liq ro‘yxatdan o‘tdingiz!\nEndi saytga telefon raqamingiz va parol bilan kira olasiz."
     );
     delete userSteps[chatId];
+  }
+});
+
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const step = userSteps[chatId];
+  const text = msg.text;
+
+  if (!step) return;
+
+  let user = await User.findOne({ chatId });
+  if (!user) return;
+
+  if (step === "askPasswordUpdate") {
+    user.password = text; // tavsiya: hash qilish
+    await user.save();
+
+    delete userSteps[chatId];
+
+    bot.sendMessage(
+      chatId,
+      "✅ Telefon raqam va parolingiz muvaffaqiyatli yangilandi!"
+    );
+    sendMainMenu(chatId, user.userName);
+    return;
   }
 });
 
@@ -454,52 +526,6 @@ bot.on("message", async (msg) => {
       "Taklifingiz adminlarga yuborildi. Javobni kuting ✅"
     );
     delete userStates[chatId];
-    return;
-  }
-});
-
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text?.trim();
-  const username = msg.from.username;
-
-  let user = await User.findOne({ chatId });
-  if (!user) return;
-
-  if (text === "Ma'lumotlarni yangilash📝") {
-    userStates[chatId] = { type: "update_info" };
-    await bot.sendMessage(chatId, "📱 Telefon raqamingizni yuboring:", {
-      reply_markup: {
-        keyboard: [
-          [{ text: "📲 Telefon raqamni yuborish", request_contact: true }],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
-    return;
-  }
-
-  if (msg.contact && userStates[chatId]?.type === "update_info") {
-    user.phone = msg.contact.phone_number;
-    await user.save();
-    userStates[chatId].type = "update_password";
-    await bot.sendMessage(chatId, "🔑 Yangi parol kiriting:");
-    return;
-  }
-
-  if (userStates[chatId]?.type === "update_password") {
-    user.password = text;
-    await user.save();
-    delete userStates[chatId];
-
-    await bot.sendMessage(
-      chatId,
-      "✅ Telefon raqam va parolingiz muvaffaqiyatli yangilandi!"
-    );
-
-    if (user.role === "admin") sendAdminMenu(chatId);
-    else sendMainMenu(chatId, username);
     return;
   }
 });
