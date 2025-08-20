@@ -106,41 +106,75 @@ function genRequestId() {
   return `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 }
 
+function setupWebhook(app) {
+  app.use(
+    `/bot${token}`,
+    bodyParser.json({
+      verify: (req, res, buf) => {
+        req.rawBody = buf.toString();
+      },
+    })
+  );
+
+  app.post(`/bot${token}`, (req, res) => {
+    try {
+      const update = JSON.parse(req.rawBody);
+      bot.processUpdate(update);
+      res.sendStatus(200);
+    } catch (err) {
+      console.error("Telegram update xato:", err);
+      res.sendStatus(500);
+    }
+  });
+}
+
+function sendMainMenu(chatId, userName) {
+  const text = `*Salom ${
+    userName ? "@" + userName : "foydalanuvchi"
+  }!* \nSavdo X telegram botiga Xush Kelibsiz😊!`;
+  bot.sendMessage(chatId, text, {
+    parse_mode: "Markdown",
+    reply_markup: USER_MENU,
+  });
+}
+
+function sendAdminMenu(chatId) {
+  bot.sendMessage(chatId, "Xush kelibsiz, Admin! Quyidagi menyudan tanlang:", {
+    reply_markup: ADMIN_MENU,
+  });
+}
+
+function asAt(username) {
+  if (!username) return "Anonim";
+  return username.startsWith("@") ? username : "@" + username;
+}
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username;
 
-  if (!username) {
-    bot.sendMessage(
-      chatId,
-      "❌ Username topilmadi. Telegram sozlamalaridan username qo‘ying va qayta /start yuboring."
-    );
-    return;
-  }
-
-  // Telefon raqam bilan birga bazada userni topamiz
-  let user = await User.findOne({
-    $or: [{ chatId }, { phone: msg.contact?.phone_number }],
-  });
+  let user = await User.findOne({ chatId });
 
   if (user) {
-    // Agar foydalanuvchi bazada bo‘lsa
     bot.sendMessage(chatId, "✅ Siz allaqachon ro‘yxatdan o‘tgansiz!");
     if (user.role === "admin") sendAdminMenu(chatId);
     else sendMainMenu(chatId, username);
     return;
   }
 
-  // Bazada user topilmadi => ro‘yxatdan o‘tish flow
-  bot.sendMessage(chatId, "📱 Telefon raqamingizni yuboring:", {
-    reply_markup: {
-      keyboard: [
-        [{ text: "📲 Telefon raqamni yuborish", request_contact: true }],
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: true,
-    },
-  });
+  bot.sendMessage(
+    chatId,
+    "📱 Salom! Savdo X botiga xush kelibsiz.\nRo‘yxatdan o‘tish uchun telefon raqamingizni yuboring:",
+    {
+      reply_markup: {
+        keyboard: [
+          [{ text: "📲 Telefon raqamni yuborish", request_contact: true }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    }
+  );
 });
 
 bot.on("contact", async (msg) => {
@@ -148,64 +182,20 @@ bot.on("contact", async (msg) => {
   const phone = msg.contact?.phone_number;
   const username = msg.from.username;
 
-  if (!username) {
-    bot.sendMessage(
-      chatId,
-      "❌ Username topilmadi. Botni username bilan ishlating."
-    );
-    return;
-  }
-
-  // Telefon raqam bazada mavjudligini tekshiramiz
   let existingUser = await User.findOne({ phone });
 
-  if (existingUser && existingUser.chatId !== chatId) {
-    // Agar telefon raqam bazada boshqa chatId bilan bo‘lsa
-    return bot.sendMessage(
-      chatId,
-      "❌ Ushbu telefon raqam bazada allaqachon ro‘yxatdan o‘tgan!"
-    );
-  }
-
-  // Bazada user topilsa, update flow
-  let user = await User.findOne({ chatId });
-  if (!user) {
-    user = new User({ userName: username, chatId, phone });
-    await user.save();
-  } else {
-    // Telefon raqamni yangilash
-    user.phone = phone;
-    await user.save();
-  }
-
-  // Parol kiritish
-  bot.sendMessage(chatId, "🔑 Yangi parol kiriting:");
-  userSteps[chatId] = "askPasswordUpdate";
-});
-
-bot.on("contact", async (msg) => {
-  const chatId = msg.chat.id;
-  const phone = msg.contact?.phone_number;
-  const username = msg.from.username;
-
-  if (!username) {
+  if (existingUser) {
     bot.sendMessage(
       chatId,
-      "❌ Username topilmadi. Botni username bilan ishlating."
+      "✅ Siz avval ro‘yxatdan o‘tibsiz.\nAgar ma’lumotlaringizni yangilamoqchi bo‘lsangiz menyudan 'Ma'lumotlarni yangilash📝' tugmasini bosing."
     );
+    if (existingUser.role === "admin") sendAdminMenu(chatId);
+    else sendMainMenu(chatId, username);
     return;
   }
 
-  let user = await User.findOne({ userName: username });
-
-  if (!user) {
-    user = new User({ userName: username, chatId, phone });
-    await user.save();
-  } else {
-    user.chatId = chatId;
-    user.phone = phone;
-    await user.save();
-  }
+  let user = new User({ userName: username, chatId, phone });
+  await user.save();
 
   bot.sendMessage(chatId, "👤 Ismingizni yozing:");
   userSteps[chatId] = "askName";
@@ -213,11 +203,10 @@ bot.on("contact", async (msg) => {
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text;
+  const text = msg.text?.trim();
   const step = userSteps[chatId];
 
   if (!step) return;
-
   let user = await User.findOne({ chatId });
   if (!user) return;
 
@@ -235,36 +224,50 @@ bot.on("message", async (msg) => {
     user.password = text;
     user.role = "customer";
     await user.save();
+    delete userSteps[chatId];
+
     bot.sendMessage(
       chatId,
       "✅ Siz to‘liq ro‘yxatdan o‘tdingiz!\nEndi saytga telefon raqamingiz va parol bilan kira olasiz."
     );
-    delete userSteps[chatId];
+    sendMainMenu(chatId, user.userName);
   }
 });
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
+  const text = msg.text?.trim();
+
+  if (text === "Ma'lumotlarni yangilash📝") {
+    let user = await User.findOne({ chatId });
+    if (!user) {
+      bot.sendMessage(
+        chatId,
+        "❌ Siz ro‘yxatdan o‘tmagansiz. /start buyrug‘ini bosing."
+      );
+      return;
+    }
+
+    user.userName = msg.from.username;
+    await user.save();
+
+    bot.sendMessage(chatId, "🔑 Yangi parolni kiriting:");
+    userSteps[chatId] = "updatePassword";
+    return;
+  }
+
   const step = userSteps[chatId];
-  const text = msg.text;
-
   if (!step) return;
-
   let user = await User.findOne({ chatId });
   if (!user) return;
 
-  if (step === "askPasswordUpdate") {
-    user.password = text; // tavsiya: hash qilish
+  if (step === "updatePassword") {
+    user.password = text;
     await user.save();
-
     delete userSteps[chatId];
 
-    bot.sendMessage(
-      chatId,
-      "✅ Telefon raqam va parolingiz muvaffaqiyatli yangilandi!"
-    );
+    bot.sendMessage(chatId, "✅ Ma’lumotlaringiz muvaffaqiyatli yangilandi!");
     sendMainMenu(chatId, user.userName);
-    return;
   }
 });
 
