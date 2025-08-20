@@ -8,7 +8,7 @@ const axios = require("axios");
 
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+const ADMIN_CHAT_ID = Number(process.env.ADMIN_CHAT_ID);
 const mongoUri = process.env.MONGO_URI;
 
 if (!token) console.error("BOT_TOKEN topilmadi!");
