@@ -198,7 +198,33 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Mahsulot topilmadi" });
     }
 
-    res.json(formatProduct(product));
+    const happyCount = await Comment.countDocuments({
+      productId: product._id,
+      rating: "happy",
+    });
+    const unhappyCount = await Comment.countDocuments({
+      productId: product._id,
+      rating: "unhappy",
+    });
+    const total = happyCount + unhappyCount;
+
+    let happyPercent = 0;
+    let unhappyPercent = 0;
+
+    if (total > 0) {
+      happyPercent = Math.round((happyCount / total) * 100);
+      unhappyPercent = 100 - happyPercent;
+    }
+
+    const formattedProduct = {
+      ...formatProduct(product),
+      rating: {
+        happy: happyPercent,
+        unhappy: unhappyPercent,
+      },
+    };
+
+    res.json(formattedProduct);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });
