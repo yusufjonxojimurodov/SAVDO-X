@@ -23,7 +23,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// POST /banners
 router.post(
   "/post",
   tokenCheck,

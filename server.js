@@ -13,10 +13,10 @@ const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
 const deliveryProducts = require("./routes/delivery.products.routes.js");
 const bannersRoutes = require("./routes/banners.routes.js");
+const permission = require("./utils/roleCheck.js");
 
 require("dotenv").config();
 const { bot, setupWebhook } = require("./bot/index.js");
-const { permission } = require("process");
 
 setupWebhook(app);
 
