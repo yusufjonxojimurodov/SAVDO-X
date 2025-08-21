@@ -75,7 +75,7 @@ app.post("/api/login", async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(400).json({ message: "Telefon raqam yoki parol xato" });
+      return res.status(400).json({ message: "Parol xato" });
 
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, { expiresIn: "24h" });
 

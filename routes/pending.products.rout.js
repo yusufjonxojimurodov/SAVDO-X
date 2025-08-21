@@ -26,12 +26,16 @@ const tokenCheck = (req, res, next) => {
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
-    const { orders, phone, userName, quantity } = req.body;
+    const { orders, phone, userName, quantity, location } = req.body;
 
     if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return res
         .status(400)
         .json({ message: "Orders array bo'sh bo'lmasligi kerak" });
+    }
+
+    if (!location || !location.lat || !location.lng) {
+      return res.status(400).json({ message: "Iltimos, marker tanlang" });
     }
 
     const pendingProducts = [];
@@ -48,6 +52,13 @@ router.post("/add", tokenCheck, async (req, res) => {
         return res.status(404).json({ message: "Bunday mahsulot topilmadi" });
       }
 
+      const geocodeRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${location.lat}&lon=${location.lng}&format=json`,
+        { headers: { "User-Agent": "MyApp/1.0" } }
+      );
+      const geocodeData = await geocodeRes.json();
+      const address = geocodeData.display_name;
+
       const pending = new PendingProduct({
         product: basketItem.product._id,
         name: basketItem.product.name,
@@ -62,6 +73,7 @@ router.post("/add", tokenCheck, async (req, res) => {
         phone,
         userName: req.userName,
         buyerChatId: req.body.buyerChatId,
+        location: { address },
       });
 
       await pending.save();
@@ -74,7 +86,9 @@ router.post("/add", tokenCheck, async (req, res) => {
             basketItem.product.name
           }" tasdiqlanishi kutilmoqda.⌚\nMijoz👤: ${
             userName ? "@" + userName : "Anonim"
-          }\nMobil Raqam📞: ${phone}\nSotib olmoqchi🧺: ${quantity} ta`,
+          }\nMobil Raqam📞: ${phone}\nSotib olmoqchi🧺: ${
+            quantity || basketItem.quantity
+          } ta\nManzil📍: ${address}`,
           {
             reply_markup: {
               inline_keyboard: [
