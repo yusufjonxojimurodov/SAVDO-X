@@ -64,41 +64,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-app.post("/api/register", async (req, res) => {
-  const { name, surname, phone, password } = req.body;
-
-  try {
-    const user = await User.findOne({
-      phone,
-      chatId: { $ne: null },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        message:
-          "Iltimos, avval botga /start bosing va telefon raqamingizni yuboring",
-      });
-    }
-
-    user.name = name;
-    user.surname = surname;
-    user.password = password;
-    await user.save();
-
-    const token = jwt.sign({ id: user._id }, JWT_TOKEN, {
-      expiresIn: "24h",
-    });
-
-    res.status(201).json({
-      message: "Akkaunt yaratildi",
-      token,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server xatosi" });
-  }
-});
-
 app.post("/api/login", async (req, res) => {
   try {
     const { phone, password } = req.body;
