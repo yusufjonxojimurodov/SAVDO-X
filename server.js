@@ -12,10 +12,11 @@ const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
 const deliveryProducts = require("./routes/delivery.products.routes.js");
-const bannersRoutes = require("./routes/banners.routes.js")
+const bannersRoutes = require("./routes/banners.routes.js");
 
 require("dotenv").config();
 const { bot, setupWebhook } = require("./bot/index.js");
+const { permission } = require("process");
 
 setupWebhook(app);
 
@@ -98,58 +99,61 @@ app.get("/api/getUserMe", tokenCheck, async (request, response) => {
   }
 });
 
-app.put("/api/update-role/:id", tokenCheck, async (req, res) => {
-  try {
-    const adminUser = await User.findById(req.userId);
-    if (adminUser.role !== "admin") {
-      return res
-        .status(403)
-        .json({ message: "Faqat admin rol o‘zgartira oladi" });
-    }
-
-    const { role } = req.body;
-    if (!["admin", "seller", "customer"].includes(role)) {
-      return res.status(400).json({ message: "Yaroqsiz rol" });
-    }
-
-    const userToUpdate = await User.findById(req.params.id);
-    if (!userToUpdate) {
-      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
-    }
-
-    if (role === "admin") {
-      const existingAdmin = await User.findOne({ role: "admin" });
-      if (
-        existingAdmin &&
-        existingAdmin._id.toString() !== userToUpdate._id.toString()
-      ) {
-        return res.status(400).json({ message: "Allaqachon admin mavjud" });
+app.put(
+  "/api/update-role/:id",
+  permission(["admin"]),
+  tokenCheck,
+  async (req, res) => {
+    try {
+      const adminUser = await User.findById(req.userId);
+      if (adminUser.role !== "admin") {
+        return res
+          .status(403)
+          .json({ message: "Faqat admin rol o‘zgartira oladi" });
       }
+
+      const { role } = req.body;
+      if (!["admin", "seller", "customer"].includes(role)) {
+        return res.status(400).json({ message: "Yaroqsiz rol" });
+      }
+
+      const userToUpdate = await User.findById(req.params.id);
+      if (!userToUpdate) {
+        return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+      }
+
+      if (role === "admin") {
+        const existingAdmin = await User.findOne({ role: "admin" });
+        if (
+          existingAdmin &&
+          existingAdmin._id.toString() !== userToUpdate._id.toString()
+        ) {
+          return res.status(400).json({ message: "Allaqachon admin mavjud" });
+        }
+      }
+
+      userToUpdate.role = role;
+      await userToUpdate.save();
+
+      res.json({
+        message: "Foydalanuvchi roli o‘zgartirildi",
+        user: userToUpdate,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server xatosi" });
     }
-
-    userToUpdate.role = role;
-    await userToUpdate.save();
-
-    res.json({
-      message: "Foydalanuvchi roli o‘zgartirildi",
-      user: userToUpdate,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server xatosi" });
   }
-});
+);
 
 app.put("/api/update-profile", tokenCheck, async (req, res) => {
   try {
-    const { name, surname, phone, email, userName, birthDate } = req.body;
+    const { name, surname, email, birthDate } = req.body;
     const updateData = {};
 
     if (name) updateData.name = name;
     if (surname) updateData.surname = surname;
-    if (phone) updateData.phone = phone;
     if (email) updateData.email = email;
-    if (userName) updateData.userName = userName;
     if (birthDate) updateData.birthDate = birthDate;
 
     const updatedUser = await User.findByIdAndUpdate(
