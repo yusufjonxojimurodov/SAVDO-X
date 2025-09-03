@@ -17,9 +17,13 @@ const deliveryProductSchema = new mongoose.Schema({
     required: true,
   },
   quantity: { type: Number, required: true },
+  points: {
+    type: Number,
+    default: 0,
+  },
   price: { type: Number, required: true },
   address: { type: String, required: false },
-  status: { type: String, default: "pending" }, // pending, delivered, cancelled
+  status: { type: String, default: "pending" },
   createdAt: { type: Date, default: Date.now },
 });
 

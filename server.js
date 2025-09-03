@@ -74,8 +74,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ message: "Telefon raqam notog‘ri" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Parol xato" });
+    if (!isMatch) return res.status(400).json({ message: "Parol xato" });
 
     const token = jwt.sign({ id: user._id }, JWT_TOKEN, { expiresIn: "24h" });
 
@@ -92,9 +91,21 @@ app.post("/api/login", async (req, res) => {
 
 app.get("/api/getUserMe", tokenCheck, async (request, response) => {
   try {
-    const user = await User.findById(request.userId).select("-password");
+    let user = await User.findById(request.userId).select("-password");
+
+    if (!user) {
+      return response.status(404).json({ message: "User topilmadi" });
+    }
+
+    user = user.toObject();
+
+    if (user.role !== "seller") {
+      delete user.points;
+    }
+
     response.json(user);
   } catch (error) {
+    console.error(error);
     response.status(500).json({ message: "Server Xatoligi" });
   }
 });

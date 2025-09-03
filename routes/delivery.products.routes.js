@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const User = require("../models/userRegister.js");
 const DeliveryProduct = require("../models/delivery.products.models.js");
 const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
@@ -120,7 +121,10 @@ router.get("/my-deliveries", tokenCheck, async (req, res) => {
 
     const deliveries = await DeliveryProduct.find({ buyerId: userId })
       .populate("sellerId", "userName phone")
-      .populate("productId", "name price image description discount discountPrice");
+      .populate(
+        "productId",
+        "name price image description discount discountPrice"
+      );
 
     res.json({
       message: "✅ Sizning delivery products",
@@ -138,7 +142,10 @@ router.get("/seller/deliveries", tokenCheck, async (req, res) => {
 
     const deliveries = await DeliveryProduct.find({ sellerId })
       .populate("buyerId", "userName phone")
-      .populate("productId", "name price image description discount discountPrice");
+      .populate(
+        "productId",
+        "name price image description discount discountPrice"
+      );
 
     res.json({
       message: "✅ Siz sotgan delivery products",
@@ -173,9 +180,20 @@ router.put("/delivery/:id/status", tokenCheck, async (req, res) => {
     delivery.status = status;
     await delivery.save();
 
+    const seller = await User.findById(req.userId);
+    if (seller && seller.role === "seller") {
+      if (status === "completed") {
+        seller.points = (seller.points || 0) + 1;
+      } else if (status === "incompleted") {
+        seller.points = (seller.points || 0) - 2;
+      }
+      await seller.save();
+    }
+
     res.json({
       message: "✅ Delivery status yangilandi",
       delivery,
+      sellerPoints: seller?.points,
     });
   } catch (err) {
     console.error(err);
