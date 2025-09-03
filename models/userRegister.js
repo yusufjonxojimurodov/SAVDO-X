@@ -34,6 +34,10 @@ const schemaCreateAccount = new mongoose.Schema({
     enum: ["admin", "seller", "customer", "blocked"],
     default: "customer",
   },
+  points: {
+    type: Number,
+    default: 0,
+  },
   chatId: {
     type: Number,
     default: null,
