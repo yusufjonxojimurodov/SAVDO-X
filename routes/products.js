@@ -269,7 +269,7 @@ router.put(
   upload.single("image"),
   async (req, res) => {
     try {
-      const { name, description, price, left, model } = req.body;
+      const { name, description, price, left, model, discount } = req.body;
       const productId = req.params.id;
       const userId = req.userId;
 
