@@ -4,6 +4,7 @@ const User = require("../models/userRegister.js");
 const DeliveryProduct = require("../models/delivery.products.models.js");
 const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
+const MonthlySale = require("../models/montlhy.sale.model.js");
 const jwt = require("jsonwebtoken");
 
 const tokenCheck = (req, res, next) => {
@@ -181,9 +182,20 @@ router.put("/delivery/:id/status", tokenCheck, async (req, res) => {
     await delivery.save();
 
     const seller = await User.findById(req.userId);
+
     if (seller && seller.role === "seller") {
       if (status === "completed") {
         seller.points = (seller.points || 0) + 1;
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+
+        await MonthlySale.findOneAndUpdate(
+          { sellerId: seller._id, year, month },
+          { $inc: { soldCount: 1 } },
+          { upsert: true, new: true }
+        );
       } else if (status === "incompleted") {
         seller.points = (seller.points || 0) - 2;
       }
@@ -198,7 +210,6 @@ router.put("/delivery/:id/status", tokenCheck, async (req, res) => {
       else newRating = 1;
 
       seller.rating = newRating;
-
       await seller.save();
     }
 

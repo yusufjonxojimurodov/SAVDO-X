@@ -14,6 +14,7 @@ const pendingRoutes = require("./routes/pending.products.rout.js");
 const deliveryProducts = require("./routes/delivery.products.routes.js");
 const bannersRoutes = require("./routes/banners.routes.js");
 const permission = require("./utils/roleCheck.js");
+const montlhySales = require("./routes/montlhy.sales.router.js");
 
 require("dotenv").config();
 const { bot, setupWebhook } = require("./bot/index.js");
@@ -37,6 +38,7 @@ app.use(avatarRouter);
 app.use("/pending/products", pendingRoutes);
 app.use("/delivery/products", deliveryProducts);
 app.use("/banner", bannersRoutes);
+app.use("/montlhy", montlhySales);
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -87,7 +89,6 @@ app.get("/users/:id", tokenCheck, async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
-
 
 app.post("/api/login", async (req, res) => {
   try {
