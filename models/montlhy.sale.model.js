@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const monthlySaleSchema = new mongoose.Schema({
   sellerId: {
@@ -13,4 +13,4 @@ const monthlySaleSchema = new mongoose.Schema({
 
 monthlySaleSchema.index({ sellerId: 1, year: 1, month: 1 }, { unique: true });
 
-export default mongoose.model("MonthlySale", monthlySaleSchema);
+module.exports = mongoose.model("MonthlySale", monthlySaleSchema);
