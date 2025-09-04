@@ -38,6 +38,10 @@ const schemaCreateAccount = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  rating: {
+    type: Number,
+    default: 1
+  },
   chatId: {
     type: Number,
     default: null,

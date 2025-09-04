@@ -101,6 +101,7 @@ app.get("/api/getUserMe", tokenCheck, async (request, response) => {
 
     if (user.role !== "seller") {
       delete user.points;
+      delete user.rating;
     }
 
     response.json(user);

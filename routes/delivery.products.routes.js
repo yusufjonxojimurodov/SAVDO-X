@@ -187,6 +187,18 @@ router.put("/delivery/:id/status", tokenCheck, async (req, res) => {
       } else if (status === "incompleted") {
         seller.points = (seller.points || 0) - 2;
       }
+
+      let newRating = 1;
+      const points = seller.points;
+
+      if (points >= 70) newRating = 5;
+      else if (points >= 40) newRating = 4;
+      else if (points >= 20) newRating = 3;
+      else if (points >= 10) newRating = 2;
+      else newRating = 1;
+
+      seller.rating = newRating;
+
       await seller.save();
     }
 
@@ -194,6 +206,7 @@ router.put("/delivery/:id/status", tokenCheck, async (req, res) => {
       message: "✅ Delivery status yangilandi",
       delivery,
       sellerPoints: seller?.points,
+      sellerRating: seller?.rating,
     });
   } catch (err) {
     console.error(err);
