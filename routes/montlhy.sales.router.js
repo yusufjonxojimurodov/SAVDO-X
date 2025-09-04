@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
-const MonthlySale = require("../models/monthly.sale.model");
+const MonthlySale = require("../models/montlhy.sale.model");
 
 const JWT_TOKEN = process.env.JWT_TOKEN;
 
