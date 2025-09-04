@@ -65,6 +65,30 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
+router.get("/users/:id", tokenCheck, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    let user = await User.findById(id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "❌ User topilmadi" });
+    }
+
+    user = user.toObject();
+
+    if (user.role !== "seller") {
+      delete user.points;
+      delete user.rating;
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error("GET /users/:id error:", err.message);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+
 app.post("/api/login", async (req, res) => {
   try {
     const { phone, password } = req.body;
