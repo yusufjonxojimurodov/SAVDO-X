@@ -65,7 +65,7 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-router.get("/users/:id", tokenCheck, async (req, res) => {
+app.get("/users/:id", tokenCheck, async (req, res) => {
   try {
     const { id } = req.params;
 
