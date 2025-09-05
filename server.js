@@ -210,6 +210,71 @@ app.put("/api/update-profile", tokenCheck, async (req, res) => {
   }
 });
 
+app.get("/api/all/users", tokenCheck, async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+    if (!adminUser || adminUser.role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "Faqat admin bu API'ni ishlata oladi" });
+    }
+
+    const { role } = req.query;
+    let filter = {};
+
+    if (role) {
+      if (!["admin", "seller", "customer", "blocked"].includes(role)) {
+        return res
+          .status(400)
+          .json({ message: "Noto‘g‘ri role qiymati kiritildi" });
+      }
+      filter.role = role;
+    }
+
+    const users = await User.find(filter).select("-password");
+
+    res.json({
+      message: "Foydalanuvchilar ro‘yxati",
+      count: users.length,
+      users,
+    });
+  } catch (error) {
+    console.error("GET /api/users xato:", error);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+app.delete("/api/users/:id", tokenCheck, async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+    if (!adminUser || adminUser.role !== "admin") {
+      return res.status(403).json({ message: "Faqat admin foydalanuvchini o‘chira oladi" });
+    }
+
+    const { id } = req.params;
+
+    const deletedUser = await User.findByIdAndDelete(id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+    }
+
+    res.json({
+      message: "Foydalanuvchi muvaffaqiyatli o‘chirildi ✅",
+      deletedUser: {
+        _id: deletedUser._id,
+        name: deletedUser.name,
+        surname: deletedUser.surname,
+        role: deletedUser.role,
+        phone: deletedUser.phone,
+      },
+    });
+  } catch (error) {
+    console.error("DELETE /api/users/:id xato:", error);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () =>
   console.log(`Server ${PORT}-portda ishlayapti`)
