@@ -138,8 +138,8 @@ app.get("/api/getUserMe", tokenCheck, async (request, response) => {
 
 app.put(
   "/api/update-role/:id",
-  permission(["admin"]),
   tokenCheck,
+  permission(["admin"]),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
@@ -219,7 +219,7 @@ app.get("/api/all/users", tokenCheck, async (req, res) => {
         .json({ message: "Faqat admin bu API'ni ishlata oladi" });
     }
 
-    const { role } = req.query;
+    const { role, page = 0 } = req.query;
     let filter = {};
 
     if (role) {
@@ -231,18 +231,30 @@ app.get("/api/all/users", tokenCheck, async (req, res) => {
       filter.role = role;
     }
 
-    const users = await User.find(filter).select("-password");
+    const limit = 12;
+    const skip = Number(page) * limit;
+
+    const totalUsers = await User.countDocuments(filter);
+
+    const users = await User.find(filter)
+      .select("-password")
+      .skip(skip)
+      .limit(limit);
 
     res.json({
       message: "Foydalanuvchilar ro‘yxati",
-      count: users.length,
+      page: Number(page),  
+      totalPages: Math.ceil(totalUsers / limit),
+      count: users.length,    
+      totalUsers,              
       users,
     });
   } catch (error) {
-    console.error("GET /api/users xato:", error);
+    console.error("GET /api/all/users xato:", error);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
 
 app.delete("/api/users/:id", tokenCheck, async (req, res) => {
   try {
