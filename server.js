@@ -150,7 +150,7 @@ app.put(
       }
 
       const { role } = req.body;
-      if (!["admin", "seller", "customer"].includes(role)) {
+      if (!["admin", "seller", "customer", "blocked"].includes(role)) {
         return res.status(400).json({ message: "Yaroqsiz rol" });
       }
 
@@ -210,6 +210,49 @@ app.put("/api/update-profile", tokenCheck, async (req, res) => {
   }
 });
 
+app.put("/api/admin/update-user/:id", tokenCheck, async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+
+    if (!adminUser || adminUser.role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "Faqat admin foydalanuvchini yangilay oladi" });
+    }
+
+    const { id } = req.params;
+    const { name, surname, phone, password } = req.body;
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (surname) updateData.surname = surname;
+    if (phone) updateData.phone = phone;
+
+    if (password) {
+      const bcrypt = require("bcrypt");
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, select: "-password" }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+    }
+
+    res.json({
+      message: "Foydalanuvchi ma'lumotlari yangilandi ✅",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("PUT /api/admin/update-user/:id xato:", error);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
 app.get("/api/all/users", tokenCheck, async (req, res) => {
   try {
     const adminUser = await User.findById(req.userId);
@@ -243,10 +286,10 @@ app.get("/api/all/users", tokenCheck, async (req, res) => {
 
     res.json({
       message: "Foydalanuvchilar ro‘yxati",
-      page: Number(page),  
+      page: Number(page),
       totalPages: Math.ceil(totalUsers / limit),
-      count: users.length,    
-      totalUsers,              
+      count: users.length,
+      totalUsers,
       users,
     });
   } catch (error) {
@@ -255,12 +298,13 @@ app.get("/api/all/users", tokenCheck, async (req, res) => {
   }
 });
 
-
 app.delete("/api/users/:id", tokenCheck, async (req, res) => {
   try {
     const adminUser = await User.findById(req.userId);
     if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({ message: "Faqat admin foydalanuvchini o‘chira oladi" });
+      return res
+        .status(403)
+        .json({ message: "Faqat admin foydalanuvchini o‘chira oladi" });
     }
 
     const { id } = req.params;
