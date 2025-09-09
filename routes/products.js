@@ -332,4 +332,48 @@ router.put(
   }
 );
 
+router.get("/products/admin", async (req, res) => {
+  try {
+    let { page = 1, size = 10 } = req.query;
+    page = parseInt(page);
+    size = parseInt(size);
+
+    const skip = (page - 1) * size;
+
+    const products = await ProductModel.find({})
+      .select("name description price discount discountPrice") 
+      .skip(skip)
+      .limit(size)
+      .sort({ createdAt: -1 }); 
+
+    const total = await ProductModel.countDocuments();
+
+    res.json({
+      page,
+      size,
+      totalPages: Math.ceil(total / size),
+      totalProducts: total,
+      products,
+    });
+  } catch (err) {
+    console.error("Pagination error:", err.message);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.get("/product/:id/image", async (req, res) => {
+  try {
+    const product = await ProductModel.findById(req.params.id).select("image");
+
+    if (!product) {
+      return res.status(404).json({ message: "Mahsulot topilmadi" });
+    }
+
+    res.json({ imageUrl: product.image });
+  } catch (err) {
+    console.error("Image fetch error:", err.message);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
 module.exports = router;
