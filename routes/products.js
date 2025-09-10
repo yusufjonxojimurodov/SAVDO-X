@@ -247,13 +247,11 @@ router.delete(
         return res.status(404).json({ message: "Mahsulot topilmadi" });
       }
 
-      // 🔑 Admin bo‘lsa — hammasini o‘chiradi
       if (req.role === "admin") {
         await ProductModel.findByIdAndDelete(productId);
-        return res.json({ message: "Mahsulotni admin o‘chirdi" });
+        return res.status(200).json({ message: "Mahsulotni admin o‘chirdi" });
       }
 
-      // 🔑 Seller bo‘lsa — faqat o‘zini mahsulotini o‘chiradi
       if (req.role === "seller") {
         if (product.createdBy.toString() !== userId.toString()) {
           return res
@@ -262,7 +260,9 @@ router.delete(
         }
 
         await ProductModel.findByIdAndDelete(productId);
-        return res.json({ message: "Mahsulot muvaffaqiyatli o‘chirildi" });
+        return res
+          .status(200)
+          .json({ message: "Mahsulot muvaffaqiyatli o‘chirildi" });
       }
 
       res.status(403).json({ message: "Sizda ruxsat yo‘q" });
