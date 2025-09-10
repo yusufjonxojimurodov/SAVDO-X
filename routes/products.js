@@ -246,7 +246,10 @@ router.delete(
         return res.status(404).json({ message: "Mahsulot topilmadi" });
       }
 
-      if (product.createdBy.toString() !== userId.toString()) {
+      if (
+        req.role !== "admin" &&
+        product.createdBy.toString() !== userId.toString()
+      ) {
         return res
           .status(403)
           .json({ message: "Sizda bu mahsulotni o‘chirish huquqi yo‘q" });
@@ -341,10 +344,10 @@ router.get("/products/admin", async (req, res) => {
     const skip = (page - 1) * size;
 
     const products = await ProductModel.find({})
-      .select("name description price discount discountPrice") 
+      .select("name description price discount discountPrice left")
       .skip(skip)
       .limit(size)
-      .sort({ createdAt: -1 }); 
+      .sort({ createdAt: -1 });
 
     const total = await ProductModel.countDocuments();
 
