@@ -344,7 +344,7 @@ router.get("/products/admin", async (req, res) => {
     const skip = (page - 1) * size;
 
     const products = await ProductModel.find({})
-      .select("name description price discount discountPrice left createdBy")
+      .select("name description price discount discountPrice left userName")
       .skip(skip)
       .limit(size)
       .sort({ createdAt: -1 });
