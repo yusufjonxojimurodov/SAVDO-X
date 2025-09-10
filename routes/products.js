@@ -246,21 +246,26 @@ router.delete(
       if (!product) {
         return res.status(404).json({ message: "Mahsulot topilmadi" });
       }
-      
+
+      // 🔑 Admin bo‘lsa — hammasini o‘chiradi
       if (req.role === "admin") {
         await ProductModel.findByIdAndDelete(productId);
         return res.json({ message: "Mahsulotni admin o‘chirdi" });
       }
 
-      if (product.createdBy.toString() !== userId.toString()) {
-        return res
-          .status(403)
-          .json({ message: "Sizda bu mahsulotni o‘chirish huquqi yo‘q" });
+      // 🔑 Seller bo‘lsa — faqat o‘zini mahsulotini o‘chiradi
+      if (req.role === "seller") {
+        if (product.createdBy.toString() !== userId.toString()) {
+          return res
+            .status(403)
+            .json({ message: "Sizda bu mahsulotni o‘chirish huquqi yo‘q" });
+        }
+
+        await ProductModel.findByIdAndDelete(productId);
+        return res.json({ message: "Mahsulot muvaffaqiyatli o‘chirildi" });
       }
 
-      await ProductModel.findByIdAndDelete(productId);
-
-      res.json({ message: "Mahsulot muvaffaqiyatli o‘chirildi" });
+      res.status(403).json({ message: "Sizda ruxsat yo‘q" });
     } catch (err) {
       console.error("DELETE /my/:id error:", err.message);
       res.status(500).json({ message: "Server xatosi" });
