@@ -21,6 +21,7 @@ const tokenCheck = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_TOKEN);
     req.userId = decoded.id;
+    req.role = decoded.role;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
