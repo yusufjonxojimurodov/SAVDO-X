@@ -65,13 +65,8 @@ const USER_MENU = {
 
 const ADMIN_MENU = {
   keyboard: [
-    ["Adminga bog‘lanish📲"],
-    ["Mahsulot egasidan Shikoyat⚠️"],
-    ["Saytdagi Muammolar🐞"],
-    ["Saytimizga takliflar📃"],
-    ["Savdo X saytida mahsulot sotish🛒"],
     ["Foydalanuvchilar ro'yxati"],
-    ["Ma'lumotlarni yangilash📝"],
+    ["Barcha userlarga xabar yozish"]["Ma'lumotlarni yangilash📝"],
   ],
   resize_keyboard: true,
   one_time_keyboard: false,
@@ -369,6 +364,46 @@ bot.on("message", async (msg) => {
         console.error("User list xato:", err);
         await bot.sendMessage(chatId, "Xatolik yuz berdi.");
       }
+      return;
+    }
+
+    if (text === "Barcha userlarga xabar yozish") {
+      adminStates[chatId] = { type: "waitingBroadcastMessage" };
+      await bot.sendMessage(chatId, "Yuboriladigan xabarni kiriting:");
+      return;
+    }
+
+    if (adminStates[chatId]?.type === "waitingBroadcastMessage") {
+      try {
+        const messageText = text;
+        const users = await User.find({ chatId: { $exists: true } })
+          .select("chatId")
+          .lean();
+
+        if (!users.length) {
+          await bot.sendMessage(chatId, "Foydalanuvchi topilmadi.");
+          delete adminStates[chatId];
+          return;
+        }
+
+        for (const user of users) {
+          try {
+            await bot.sendMessage(user.chatId, `Admin xabari:\n${messageText}`);
+          } catch (err) {
+            console.error(`Xabar yuborilmadi ${user.chatId}:`, err);
+          }
+        }
+
+        await bot.sendMessage(
+          chatId,
+          "Xabar barcha foydalanuvchilarga yuborildi ✅"
+        );
+      } catch (err) {
+        console.error("Broadcast xato:", err);
+        await bot.sendMessage(chatId, "Xatolik yuz berdi.");
+      }
+
+      delete adminStates[chatId];
       return;
     }
 
