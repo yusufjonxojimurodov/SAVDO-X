@@ -20,9 +20,10 @@ setupWebhook(app);
 
 app.use(
   cors({
-    origin: false,
+    origin: 'https://savdox.netlify.app',
+    methods: ["GET", "DELETE", "POST", "PUT", "PATCH"],
     allowedHeaders: ["Authorization", "Content-Type"],
-    credentials: false,
+    credentials: true,
   })
 );
 
@@ -54,6 +55,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () =>
   console.log(`Server ${PORT}-portda ishlayapti`)
 );
-
-
-//Savdo X Backend
