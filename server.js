@@ -20,7 +20,7 @@ setupWebhook(app);
 
 app.use(
   cors({
-    origin: 'https://savdox.netlify.app',
+    origin: ["https://savdo-x-admin.netlify.app", "https://savdox.netlify.app"],
     methods: ["GET", "DELETE", "POST", "PUT", "PATCH"],
     allowedHeaders: ["Authorization", "Content-Type"],
     credentials: true,
