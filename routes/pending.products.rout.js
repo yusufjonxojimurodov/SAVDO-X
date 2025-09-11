@@ -3,26 +3,8 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const BasketProduct = require("../models/basketProduct.js");
 const PendingProduct = require("../models/pending.products.js");
-const ProductModel = require("../models/products.js");
 const { bot } = require("../bot/index.js");
-const axios = require("axios");
-
-const tokenCheck = (req, res, next) => {
-  if (req.query?.sellerBot === "true" || req.body?.sellerBot === true) {
-    return next();
-  }
-
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Token topilmadi" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_TOKEN);
-    req.userId = decoded.id;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
-  }
-};
+const tokenCheck = require("../middleware/token.js")
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {

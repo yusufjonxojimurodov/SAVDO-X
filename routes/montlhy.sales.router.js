@@ -20,7 +20,6 @@ const tokenCheck = (req, res, next) => {
   }
 };
 
-// 🔹 Oylik sotuvlar
 router.get("/sales", tokenCheck, async (req, res) => {
   try {
     const { year } = req.query;
@@ -38,7 +37,6 @@ router.get("/sales", tokenCheck, async (req, res) => {
   }
 });
 
-// 🔹 Yillik sotuvlar
 router.get("/sales/yearly", tokenCheck, async (req, res) => {
   try {
     const stats = await MonthlySale.aggregate([

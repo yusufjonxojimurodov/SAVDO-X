@@ -1,32 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const ProductModel = require("../models/products");
-const jwt = require("jsonwebtoken");
+const tokenCheck = require("../middleware/token.js")
 const multer = require("multer");
 const axios = require("axios");
 const fs = require("fs");
 const FormData = require("form-data");
-const sharp = require("sharp");
 const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
-const { removeBackgroundFromImageFile } = require("remove.bg");
-const PendingProduct = require("../models/pending.products.js");
-const bot = require("../bot/index.js");
 
 const upload = multer({ dest: "temp/" });
-
-const tokenCheck = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Token topilmadi" });
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_TOKEN);
-    req.userId = decoded.id;
-    req.role = decoded.role;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
-  }
-};
 
 const formatProduct = (product) => {
   const obj = product.toObject ? product.toObject() : product;
@@ -188,7 +171,7 @@ router.post(
   }
 );
 
-router.get("/:id", async (req, res) => {
+router.get("/get/:id", async (req, res) => {
   try {
     const product = await ProductModel.findById(req.params.id).populate(
       "createdBy",

@@ -5,24 +5,7 @@ const DeliveryProduct = require("../models/delivery.products.models.js");
 const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
 const MonthlySale = require("../models/montlhy.sale.model.js");
-const jwt = require("jsonwebtoken");
-
-const tokenCheck = (req, res, next) => {
-  if (!req.headers.authorization && req.body.sellerBot) {
-    return next();
-  }
-
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Token topilmadi" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_TOKEN);
-    req.userId = decoded.id;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
-  }
-};
+const tokenCheck = require("../middleware/token.js")
 
 router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
   try {
