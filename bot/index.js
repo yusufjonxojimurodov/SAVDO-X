@@ -66,7 +66,8 @@ const USER_MENU = {
 const ADMIN_MENU = {
   keyboard: [
     ["Foydalanuvchilar ro'yxati"],
-    ["Barcha userlarga xabar yozish"]["Ma'lumotlarni yangilash📝"],
+    ["Barcha userlarga xabar yozish"],
+    ["Ma'lumotlarni yangilash📝"],
   ],
   resize_keyboard: true,
   one_time_keyboard: false,
@@ -369,40 +370,53 @@ bot.on("message", async (msg) => {
 
     if (text === "Barcha userlarga xabar yozish") {
       adminStates[chatId] = { type: "waitingBroadcastMessage" };
-      await bot.sendMessage(chatId, "Yuboriladigan xabarni kiriting:");
+      await bot.sendMessage(
+        chatId,
+        "Iltimos, barcha foydalanuvchilarga yubormoqchi bo‘lgan xabarni kiriting. Matn, rasm yoki hujjat bo‘lishi mumkin."
+      );
       return;
     }
 
     if (adminStates[chatId]?.type === "waitingBroadcastMessage") {
-      try {
-        const messageText = text;
-        const users = await User.find({ chatId: { $exists: true } })
-          .select("chatId")
-          .lean();
+      const users = await User.find({}).select("chatId").lean();
 
-        if (!users.length) {
-          await bot.sendMessage(chatId, "Foydalanuvchi topilmadi.");
-          delete adminStates[chatId];
-          return;
-        }
-
-        for (const user of users) {
-          try {
-            await bot.sendMessage(user.chatId, `Admin xabari:\n${messageText}`);
-          } catch (err) {
-            console.error(`Xabar yuborilmadi ${user.chatId}:`, err);
-          }
-        }
-
-        await bot.sendMessage(
-          chatId,
-          "Xabar barcha foydalanuvchilarga yuborildi ✅"
-        );
-      } catch (err) {
-        console.error("Broadcast xato:", err);
-        await bot.sendMessage(chatId, "Xatolik yuz berdi.");
+      if (!users.length) {
+        await bot.sendMessage(chatId, "Hozircha foydalanuvchilar yo‘q.");
+        delete adminStates[chatId];
+        return;
       }
 
+      const broadcastText = text; // matn
+      const photo = msg.photo ? msg.photo[msg.photo.length - 1].file_id : null; // rasm
+      const document = msg.document ? msg.document.file_id : null; // dokument
+      const video = msg.video ? msg.video.file_id : null; // video
+
+      for (const user of users) {
+        try {
+          if (photo) {
+            await bot.sendPhoto(user.chatId, photo, {
+              caption: broadcastText || "",
+            });
+          } else if (document) {
+            await bot.sendDocument(user.chatId, document, {
+              caption: broadcastText || "",
+            });
+          } else if (video) {
+            await bot.sendVideo(user.chatId, video, {
+              caption: broadcastText || "",
+            });
+          } else if (broadcastText) {
+            await bot.sendMessage(user.chatId, broadcastText);
+          }
+        } catch (err) {
+          console.error(`Xabar yuborishda xato: ${user.chatId}`, err);
+        }
+      }
+
+      await bot.sendMessage(
+        chatId,
+        "Xabar barcha foydalanuvchilarga yuborildi ✅"
+      );
       delete adminStates[chatId];
       return;
     }
