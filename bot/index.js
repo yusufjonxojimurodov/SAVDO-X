@@ -386,25 +386,21 @@ bot.on("message", async (msg) => {
         return;
       }
 
-      const broadcastText = text; // matn
-      const photo = msg.photo ? msg.photo[msg.photo.length - 1].file_id : null; // rasm
-      const document = msg.document ? msg.document.file_id : null; // dokument
-      const video = msg.video ? msg.video.file_id : null; // video
+      const broadcastText = msg.caption || msg.text || ""; 
+      const photo = msg.photo ? msg.photo[msg.photo.length - 1].file_id : null;
+      const document = msg.document ? msg.document.file_id : null;
+      const video = msg.video ? msg.video.file_id : null;
 
       for (const user of users) {
         try {
           if (photo) {
-            await bot.sendPhoto(user.chatId, photo, {
-              caption: broadcastText || "",
-            });
+            await bot.sendPhoto(user.chatId, photo, { caption: broadcastText });
           } else if (document) {
             await bot.sendDocument(user.chatId, document, {
-              caption: broadcastText || "",
+              caption: broadcastText,
             });
           } else if (video) {
-            await bot.sendVideo(user.chatId, video, {
-              caption: broadcastText || "",
-            });
+            await bot.sendVideo(user.chatId, video, { caption: broadcastText });
           } else if (broadcastText) {
             await bot.sendMessage(user.chatId, broadcastText);
           }
