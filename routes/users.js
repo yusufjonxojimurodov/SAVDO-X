@@ -288,8 +288,6 @@ router.delete(
 
 router.get(
   "/:id",
-  tokenCheck,
-  permission(["admin", "seller", "customer"]),
   async (req, res) => {
     try {
       const { id } = req.params;
