@@ -72,7 +72,7 @@ router.get(
 );
 
 router.put(
-  "/api/update-role/:id",
+  "/update/role/:id",
   tokenCheck,
   permission(["admin"]),
   async (req, res) => {
