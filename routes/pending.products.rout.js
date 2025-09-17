@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const BasketProduct = require("../models/basketProduct.js");
 const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
-const tokenCheck = require("../middleware/token.js")
+const tokenCheck = require("../middleware/token.js");
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
@@ -55,7 +55,11 @@ router.post("/add", tokenCheck, async (req, res) => {
         phone,
         userName: req.userName,
         buyerChatId: req.body.buyerChatId,
-        location: { address },
+        location: {
+          lat: location.lat,
+          lng: location.lng,
+          address,
+        },
       });
 
       await pending.save();
