@@ -37,39 +37,35 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get(
-  "/getUserMe",
-  tokenCheck,
-  async (req, res) => {
-    try {
-      // token middleware orqali userId olinadi
-      const userId = req.userId;
+router.get("/getUserMe", tokenCheck, async (req, res) => {
+  try {
+    // token middleware orqali userId olinadi
+    const userId = req.userId;
 
-      if (!userId) {
-        return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
-      }
-
-      let user = await User.findById(userId).select("-password");
-
-      if (!user) {
-        return res.status(404).json({ message: "User topilmadi" });
-      }
-
-      user = user.toObject();
-
-      // seller bo‘lmasa points va ratingni o‘chirish
-      if (user.role !== "seller") {
-        delete user.points;
-        delete user.rating;
-      }
-
-      res.json(user);
-    } catch (error) {
-      console.error("GET /users/getUserMe error:", error);
-      res.status(500).json({ message: "Server xatoligi" });
+    if (!userId) {
+      return res.status(401).json({ message: "Token noto‘g‘ri yoki eskirgan" });
     }
+
+    let user = await User.findById(userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User topilmadi" });
+    }
+
+    user = user.toObject();
+
+    // seller bo‘lmasa points va ratingni o‘chirish
+    if (user.role !== "seller") {
+      delete user.points;
+      delete user.rating;
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("GET /users/getUserMe error:", error);
+    res.status(500).json({ message: "Server xatoligi" });
   }
-);
+});
 
 router.put(
   "/update/role/:id",
@@ -286,30 +282,33 @@ router.delete(
   }
 );
 
-router.get(
-  "/:id",
-  async (req, res) => {
-    try {
-      const { id } = req.params;
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
 
-      let user = await User.findById(id).select("-password");
-      if (!user) {
-        return res.status(404).json({ message: "❌ User topilmadi" });
-      }
-
-      user = user.toObject();
-
-      if (user.role !== "seller") {
-        delete user.points;
-        delete user.rating;
-      }
-
-      res.json(user);
-    } catch (err) {
-      console.error("GET /users/:id error:", err.message);
-      res.status(500).json({ message: "Server xatosi" });
+    let user = await User.findById(id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "❌ User topilmadi" });
     }
+
+    user = user.toObject();
+
+    if (user.role !== "seller") {
+      delete user.points;
+      delete user.rating;
+    }
+
+    if (user._id) {
+      user.avatarUrl = `${req.protocol}://${req.get("host")}/api/avatar/${
+        user._id
+      }/file`;
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error("GET /users/:id error:", err.message);
+    res.status(500).json({ message: "Server xatosi" });
   }
-);
+});
 
 module.exports = router;
