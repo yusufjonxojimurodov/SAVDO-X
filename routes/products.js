@@ -13,11 +13,20 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const formatProduct = (product) => {
   const obj = product.toObject ? product.toObject() : product;
+
   if (obj.discount) {
     obj.discountPrice = obj.price - (obj.price * obj.discount) / 100;
   }
+
+  if (obj._id && obj.image && obj.image.data) {
+    obj.imageUrl = `/api/products/product/${obj._id}/image`;
+  }
+
+  delete obj.image;
+
   return obj;
 };
+
 
 router.get("/", async (req, res) => {
   try {
