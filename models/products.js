@@ -2,7 +2,10 @@ const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema(
   {
-    image: { type: String },
+    image: {
+      data: Buffer,
+      contentType: String,
+    },
     name: {
       type: String,
       required: [true, "Mahsulotga Nomi kirgizilishi shart !"],
@@ -33,7 +36,7 @@ const productSchema = new mongoose.Schema(
       default: 0,
     },
     discountPrice: {
-      type: Number
+      type: Number,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

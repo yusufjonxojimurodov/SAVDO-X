@@ -1,13 +1,10 @@
 const express = require("express");
-const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
-const FormData = require("form-data");
 const User = require("../models/userRegister");
-const tokenCheck = require("../middleware/token.js")
-const router = express.Router();
+const tokenCheck = require("../middleware/token.js");
 
-const IMGBB_API_KEY = process.env.IMGBB_API_KEY;
+const router = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -21,30 +18,20 @@ router.post(
         return res.status(400).json({ message: "Rasm fayli yuborilmadi" });
       }
 
-      const base64Image = req.file.buffer.toString("base64");
-
-      const formData = new FormData();
-      formData.append("image", base64Image);
-
-      const imgbbRes = await axios.post(
-        `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
-        formData,
-        { headers: formData.getHeaders() }
-      );
-
-      const imageUrl = imgbbRes.data.data.url;
-
       const user = await User.findById(req.userId);
       if (!user) {
         return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
       }
 
-      user.avatar = imageUrl;
+      user.avatar = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
       await user.save();
 
-      res.json({ message: "Avatar yuklandi", avatar: imageUrl });
+      res.json({ message: "Avatar yuklandi" });
     } catch (error) {
-      console.error("Upload xatolik:", error.response?.data || error.message);
+      console.error("Upload xatolik:", error.message);
       res.status(500).json({ message: "Rasm yuklashda xatolik" });
     }
   }
@@ -53,10 +40,12 @@ router.post(
 router.get("/users/get/avatar", tokenCheck, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user || !user.avatar) {
+    if (!user || !user.avatar || !user.avatar.data) {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
-    res.json({ avatar: user.avatar });
+
+    res.contentType(user.avatar.contentType);
+    res.send(user.avatar.data);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server xatosi" });
@@ -70,7 +59,7 @@ router.delete("/users/avatar", tokenCheck, async (req, res) => {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
 
-    user.avatar = "";
+    user.avatar = undefined;
     await user.save();
 
     res.json({ message: "Avatar o‘chirildi" });

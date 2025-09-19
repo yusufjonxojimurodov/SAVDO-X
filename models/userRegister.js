@@ -18,8 +18,8 @@ const schemaCreateAccount = new mongoose.Schema({
     default: "",
   },
   avatar: {
-    type: String,
-    default: "",
+    data: Buffer,
+    contentType: String,
   },
   email: {
     type: String,
@@ -40,7 +40,7 @@ const schemaCreateAccount = new mongoose.Schema({
   },
   rating: {
     type: Number,
-    default: 1
+    default: 1,
   },
   chatId: {
     type: Number,

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const ProductModel = require("../models/products");
-const tokenCheck = require("../middleware/token.js")
+const tokenCheck = require("../middleware/token.js");
 const multer = require("multer");
 const axios = require("axios");
 const fs = require("fs");
@@ -9,7 +9,7 @@ const FormData = require("form-data");
 const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
 
-const upload = multer({ dest: "temp/" });
+const upload = multer({ storage: multer.memoryStorage() });
 
 const formatProduct = (product) => {
   const obj = product.toObject ? product.toObject() : product;
@@ -127,22 +127,6 @@ router.post(
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
-      const inputPath = req.file.path;
-
-      const imageBuffer = fs.readFileSync(inputPath);
-      const imageBase64 = imageBuffer.toString("base64");
-
-      const formData = new FormData();
-      formData.append("image", imageBase64);
-
-      const response = await axios.post(
-        `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
-        formData,
-        { headers: formData.getHeaders() }
-      );
-
-      fs.unlinkSync(inputPath);
-      const imageUrl = response.data.data.url;
       const discountPrice = discount ? price - (price * discount) / 100 : price;
 
       const newProduct = new ProductModel({
@@ -155,7 +139,10 @@ router.post(
         discountPrice,
         left,
         createdBy: req.userId,
-        image: imageUrl,
+        image: {
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        },
       });
       await newProduct.save();
 
@@ -279,25 +266,11 @@ router.put(
           .json({ message: "Sizda bu mahsulotni tahrirlash huquqi yo‘q" });
       }
 
-      let imageUrl = product.image;
-
       if (req.file) {
-        const inputPath = req.file.path;
-
-        const imageBuffer = fs.readFileSync(inputPath);
-        const imageBase64 = imageBuffer.toString("base64");
-
-        const formData = new FormData();
-        formData.append("image", imageBase64);
-
-        const response = await axios.post(
-          `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
-          formData,
-          { headers: formData.getHeaders() }
-        );
-
-        fs.unlinkSync(inputPath);
-        imageUrl = response.data.data.url;
+        product.image = {
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        };
       }
 
       product.name = name ?? product.name;
@@ -305,7 +278,6 @@ router.put(
       product.price = price ?? product.price;
       product.left = left ?? product.left;
       product.model = model ?? product.model;
-      product.image = imageUrl;
       product.discount = discount ?? product.discount;
       product.discountPrice = product.discount
         ? product.price - (product.price * product.discount) / 100
@@ -360,11 +332,12 @@ router.get("/product/:id/image", async (req, res) => {
   try {
     const product = await ProductModel.findById(req.params.id).select("image");
 
-    if (!product) {
-      return res.status(404).json({ message: "Mahsulot topilmadi" });
+    if (!product || !product.image || !product.image.data) {
+      return res.status(404).json({ message: "Mahsulot rasmi topilmadi" });
     }
 
-    res.json({ imageUrl: product.image });
+    res.contentType(product.image.contentType);
+    res.send(product.image.data);
   } catch (err) {
     console.error("Image fetch error:", err.message);
     res.status(500).json({ message: "Server xatosi" });
