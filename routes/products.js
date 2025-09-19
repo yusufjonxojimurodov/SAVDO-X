@@ -20,9 +20,9 @@ const formatProduct = (product) => {
 
   if (obj._id && obj.image && obj.image.data) {
     obj.image = `${process.env.URL}/api/products/product/${obj._id}/image`;
+  } else {
+    obj.image = null;
   }
-
-  delete obj.image;
 
   return obj;
 };
