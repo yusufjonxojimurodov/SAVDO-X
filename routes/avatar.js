@@ -23,7 +23,7 @@ router.post(
 
       user.avatar = {
         data: req.file.buffer,
-        contentType: req.file.mimetype,
+        contentType: "image/jpeg",
       };
       await user.save();
 
