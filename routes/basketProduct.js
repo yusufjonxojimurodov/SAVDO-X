@@ -44,7 +44,7 @@ router.get("/", tokenCheck, async (req, res) => {
     const filteredBasket = basket
       .filter((b) => b.product !== null)
       .map((b) => {
-        let imageUrl = null;
+        let image = null;
 
         if (b.product.image && b.product._id) {
           image = `${req.protocol}://${req.get("host")}/api/products/${
