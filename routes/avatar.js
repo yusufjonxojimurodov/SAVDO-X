@@ -27,9 +27,9 @@ router.post(
       };
       await user.save();
 
-      const avatarUrl = `${req.protocol}://${req.get("host")}/users/avatar/${
-        user._id
-      }/file`;
+      const avatarUrl = `${req.protocol}://${req.get(
+        "host"
+      )}/api/avatar/users/avatar/${user._id}/file`;
 
       res.json({
         message: "Avatar yuklandi",
@@ -49,9 +49,9 @@ router.get("/users/get/avatar", tokenCheck, async (req, res) => {
       return res.status(404).json({ message: "Avatar topilmadi" });
     }
 
-    const avatarUrl = `${req.protocol}://${req.get("host")}/users/avatar/${
-      user._id
-    }/file`;
+    const avatarUrl = `${req.protocol}://${req.get(
+      "host"
+    )}/api/avatar/users/avatar/${user._id}/file`; 
 
     res.json({ avatarUrl });
   } catch (error) {
