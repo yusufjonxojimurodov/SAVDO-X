@@ -299,7 +299,7 @@ router.get("/:id", async (req, res) => {
     }
 
     if (user._id) {
-      user.avatarUrl = `${req.protocol}://${req.get("host")}/api/avatar/${
+      user.avatar = `${req.protocol}://${req.get("host")}/api/avatar/${
         user._id
       }/file`;
     }
