@@ -19,14 +19,13 @@ const formatProduct = (product) => {
   }
 
   if (obj._id && obj.image && obj.image.data) {
-    obj.imageUrl = `/api/products/product/${obj._id}/image`;
+    obj.imageUrl = `${process.env.URL}/api/products/product/${obj._id}/image`;
   }
 
   delete obj.image;
 
   return obj;
 };
-
 
 router.get("/", async (req, res) => {
   try {
