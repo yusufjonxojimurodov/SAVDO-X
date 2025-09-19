@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const BasketProduct = require("../models/basketProduct.js");
-const tokenCheck = require("../middleware/token.js")
+const tokenCheck = require("../middleware/token.js");
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
@@ -34,27 +34,41 @@ router.post("/add", tokenCheck, async (req, res) => {
 router.get("/", tokenCheck, async (req, res) => {
   try {
     const { search } = req.query;
-
     let filter = { user: req.userId };
 
-    if (search) {
-      filter = {
-        ...filter,
-      };
-    }
+    const basket = await BasketProduct.find(filter).populate({
+      path: "product",
+      match: search ? { name: { $regex: search, $options: "i" } } : {},
+    });
 
-    const basket = await BasketProduct.find(filter)
-      .populate({
-        path: "product",
-        match: search
-          ? { name: { $regex: search, $options: "i" } }
-          : {},
+    const filteredBasket = basket
+      .filter((b) => b.product !== null)
+      .map((b) => {
+        let imageUrl = null;
+
+        if (b.product.image && b.product._id) {
+          image = `${req.protocol}://${req.get("host")}/api/products/${
+            b.product._id
+          }/image`;
+        }
+
+        return {
+          _id: b._id,
+          quantity: b.quantity,
+          product: {
+            _id: b.product._id,
+            name: b.product.name,
+            price: b.product.price,
+            model: b.product.model,
+            description: b.product.description,
+            image,
+          },
+        };
       });
-
-    const filteredBasket = basket.filter((b) => b.product !== null);
 
     res.json(filteredBasket);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
