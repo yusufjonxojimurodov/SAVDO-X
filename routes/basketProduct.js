@@ -47,7 +47,7 @@ router.get("/", tokenCheck, async (req, res) => {
         let image = null;
 
         if (b.product.image && b.product._id) {
-          image = `${req.protocol}://${req.get("host")}/api/products/${
+          image = `${req.protocol}://${req.get("host")}/api/products/product/${
             b.product._id
           }/image`;
         }
