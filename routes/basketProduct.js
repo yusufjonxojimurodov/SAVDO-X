@@ -55,14 +55,15 @@ router.get("/", tokenCheck, async (req, res) => {
         return {
           _id: b._id,
           quantity: b.quantity,
-          product: {
-            _id: b.product._id,
-            name: b.product.name,
-            price: b.product.price,
-            model: b.product.model,
-            description: b.product.description,
-            image,
-          },
+          productId: b.product._id,
+          name: b.product.name,
+          price: b.product.price,
+          model: b.product.model,
+          description: b.product.description,
+          image,
+          discount: b.product.discount || 0,
+          discountPrice: b.product.discountPrice || null,
+          left: b.product.left || 0,
         };
       });
 
