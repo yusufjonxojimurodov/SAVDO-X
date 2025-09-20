@@ -39,7 +39,7 @@ router.post("/add", tokenCheck, async (req, res) => {
         { headers: { "User-Agent": "MyApp/1.0" } }
       );
       const geocodeData = await geocodeRes.json();
-      const address = geocodeData.display_name;
+      const address = "Tizim xatosi "
 
       const pending = new PendingProduct({
         product: basketItem.product._id,
