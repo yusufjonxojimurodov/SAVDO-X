@@ -34,11 +34,11 @@ router.post("/add", tokenCheck, async (req, res) => {
         return res.status(404).json({ message: "Bunday mahsulot topilmadi" });
       }
 
-      const geocodeRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${location.lat}&lon=${location.lng}&format=json`,
-        { headers: { "User-Agent": "MyApp/1.0" } }
-      );
-      const geocodeData = await geocodeRes.json();
+      // const geocodeRes = await fetch(
+      //   `https://nominatim.openstreetmap.org/reverse?lat=${location.lat}&lon=${location.lng}&format=json`,
+      //   { headers: { "User-Agent": "MyApp/1.0" } }
+      // );
+      // const geocodeData = await geocodeRes.json();
       const address = "Tizim xatosi "
 
       const pending = new PendingProduct({
