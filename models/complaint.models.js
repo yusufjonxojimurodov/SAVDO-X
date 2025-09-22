@@ -19,7 +19,8 @@ const complaintSchema = new mongoose.Schema(
     },
 
     complainant: {
-      fullName: String,
+      name: String,
+      surname: String,
       userName: String,
       phone: String,
     },
