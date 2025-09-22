@@ -260,7 +260,8 @@ router.put(
   upload.single("image"),
   async (req, res) => {
     try {
-      const { name, description, price, left, model, discount } = req.body;
+      const { name, description, price, left, model, discount, type } =
+        req.body;
       const productId = req.params.id;
       const userId = req.userId;
 
@@ -288,6 +289,7 @@ router.put(
       product.price = price ?? product.price;
       product.left = left ?? product.left;
       product.model = model ?? product.model;
+      product.type = type ?? product.type;
       product.discount = discount ?? product.discount;
       product.discountPrice = product.discount
         ? product.price - (product.price * product.discount) / 100
