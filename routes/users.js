@@ -5,6 +5,7 @@ const tokenCheck = require("../middleware/token.js");
 const bcrypt = require("bcrypt");
 const User = require("../models/userRegister.js");
 const jwt = require("jsonwebtoken");
+const complaint = require("../models/complaint.models.js");
 
 require("dotenv").config();
 
@@ -311,5 +312,29 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
+router.get(
+  "/my/complaints",
+  tokenCheck,
+  permission(["seller"]),
+  async (req, res) => {
+    try {
+      const sellerId = req.userId;
+
+      const complaints = await Complaint.find({ "seller.id": sellerId })
+        .populate("product", "name model type")
+        .sort({ createdAt: -1 }); 
+
+      res.json({
+        message: "✅ Sizga qilingan shikoyatlar",
+        count: complaints.length,
+        complaints,
+      });
+    } catch (err) {
+      console.error("GET /users/my/complaints xato:", err.message);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
 
 module.exports = router;
