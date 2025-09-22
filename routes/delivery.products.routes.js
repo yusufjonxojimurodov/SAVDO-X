@@ -5,7 +5,7 @@ const DeliveryProduct = require("../models/delivery.products.models.js");
 const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
 const MonthlySale = require("../models/montlhy.sale.model.js");
-const tokenCheck = require("../middleware/token.js")
+const tokenCheck = require("../middleware/token.js");
 
 router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
   try {
@@ -110,9 +110,29 @@ router.get("/my-deliveries", tokenCheck, async (req, res) => {
         "name price image description discount discountPrice"
       );
 
+    const formattedOrders = deliveries.map((order) => {
+      const obj = order.toObject ? order.toObject() : order;
+
+      if (obj) {
+        const productObj = obj.toObject
+          ? obj.toObject()
+          : obj;
+
+        if (productObj._id && productObj.image && productObj.image.data) {
+          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        } else {
+          productObj.image = null;
+        }
+
+        obj = productObj;
+      }
+
+      return obj;
+    });
+
     res.json({
       message: "✅ Sizning delivery products",
-      deliveries,
+      formattedOrders,
     });
   } catch (err) {
     console.error(err);
