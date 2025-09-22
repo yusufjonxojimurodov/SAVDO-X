@@ -111,12 +111,12 @@ router.get("/my-deliveries", tokenCheck, async (req, res) => {
       );
 
     const formattedOrders = deliveries.map((order) => {
-      const obj = order.toObject ? order.toObject() : order;
+      let obj = order.toObject ? order.toObject() : order; // let bo‘lishi kerak
 
-      if (obj) {
-        const productObj = obj.toObject
-          ? obj.toObject()
-          : obj;
+      if (obj.productId) {
+        let productObj = obj.productId.toObject
+          ? obj.productId.toObject()
+          : obj.productId;
 
         if (productObj._id && productObj.image && productObj.image.data) {
           productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
@@ -124,7 +124,7 @@ router.get("/my-deliveries", tokenCheck, async (req, res) => {
           productObj.image = null;
         }
 
-        obj = productObj;
+        obj.productId = productObj; // productni yangilab qo‘yish kifoya
       }
 
       return obj;
@@ -151,9 +151,29 @@ router.get("/seller/deliveries", tokenCheck, async (req, res) => {
         "name price image description discount discountPrice"
       );
 
+    const formattedOrders = deliveries.map((order) => {
+      let obj = order.toObject ? order.toObject() : order;
+
+      if (obj.productId) {
+        let productObj = obj.productId.toObject
+          ? obj.productId.toObject()
+          : obj.productId;
+
+        if (productObj._id && productObj.image && productObj.image.data) {
+          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        } else {
+          productObj.image = null;
+        }
+
+        obj.productId = productObj;
+      }
+
+      return obj;
+    });
+
     res.json({
       message: "✅ Siz sotgan delivery products",
-      deliveries,
+      formattedOrders,
     });
   } catch (err) {
     console.error(err);
