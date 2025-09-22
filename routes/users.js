@@ -31,7 +31,7 @@ router.post("/login", async (req, res) => {
       name: user.name,
       surname: user.surname,
       phone: user.phone,
-      role: user.role
+      role: user.role,
     });
   } catch (error) {
     res.status(500).json({ message: "Server xatoligi" });
@@ -300,9 +300,9 @@ router.get("/:id", async (req, res) => {
     }
 
     if (user._id) {
-      user.avatar = `${req.protocol}://${req.get("host")}/api/avatar/${
-        user._id
-      }/file`;
+      user.avatar = `${req.protocol}://${req.get(
+        "host"
+      )}/api/avatar/users/avatar/${user._id}/file`;
     }
 
     res.json(user);

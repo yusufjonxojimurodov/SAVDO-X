@@ -39,7 +39,7 @@ router.post("/add", tokenCheck, async (req, res) => {
       //   { headers: { "User-Agent": "MyApp/1.0" } }
       // );
       // const geocodeData = await geocodeRes.json();
-      const address = "Tizim xatosi "
+      const address = "Tizim xatosi ";
 
       const pending = new PendingProduct({
         product: basketItem.product._id,
@@ -115,12 +115,31 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
       .populate("product")
       .populate("createdBy", "name userName");
 
-    res.json(pendingOrders);
+    const formattedOrders = pendingOrders.map((order) => {
+      const obj = order.toObject ? order.toObject() : order;
+
+      if (obj.product) {
+        const productObj = obj.product.toObject ? obj.product.toObject() : obj.product;
+
+        if (productObj._id && productObj.image && productObj.image.data) {
+          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        } else {
+          productObj.image = null;
+        }
+
+        obj.product = productObj;
+      }
+
+      return obj;
+    });
+
+    res.json(formattedOrders);
   } catch (err) {
-    console.error(err);
+    console.error("my-pending/buyer error:", err);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
 
 router.get("/my-pending/seller", tokenCheck, async (req, res) => {
   try {

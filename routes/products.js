@@ -8,6 +8,8 @@ const fs = require("fs");
 const FormData = require("form-data");
 const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
+const Complaint = require("../models/complaint.models.js");
+const { bot } = require("../bot/index.js");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -348,6 +350,74 @@ router.get("/product/:id/image", async (req, res) => {
     res.send(product.image.data);
   } catch (err) {
     console.error("Image fetch error:", err.message);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.post("/complaint/:productId", tokenCheck, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { name, surname, phone, userName, message } = req.body;
+
+    const product = await ProductModel.findById(productId).populate(
+      "createdBy",
+      "chatId userName name phone"
+    );
+    if (!product) {
+      return res.status(404).json({ message: "Mahsulot topilmadi" });
+    }
+
+    const complaint = new Complaint({
+      product: product._id,
+      productName: product.name,
+      productType: product.type,
+      productModel: product.model,
+
+      seller: {
+        id: product.createdBy._id,
+        name: product.createdBy.name,
+        surname: product.createdBy.surname,
+        userName: product.createdBy.userName,
+        phone: product.createdBy.phone,
+      },
+
+      complainant: {
+        name,
+        surname,
+        userName,
+        phone,
+      },
+
+      message,
+    });
+
+    await complaint.save();
+
+    if (product.createdBy.chatId) {
+      const complaintMsg =
+        `⚠️ *Mahsulotga shikoyat!* ⚠️\n\n` +
+        `📦 Mahsulot: *${product.name}*\n` +
+        `🔖 Turi: ${product.type || "-"}\n` +
+        `📌 Model: ${product.model || "-"}\n\n` +
+        `👤 Shikoyatchi: ${name + surname}\n` +
+        `📞 Telefon: ${phone}\n` +
+        `🔗 Username: ${userName ? "@" + userName : "Anonim"}\n\n` +
+        `💬 Xabar:\n${message}`;
+
+      try {
+        await bot.sendMessage(product.createdBy.chatId, complaintMsg, {
+          parse_mode: "Markdown",
+        });
+      } catch (err) {
+        console.error("Botga xabar yuborilmadi:", err.message);
+      }
+    }
+
+    res
+      .status(201)
+      .json({ message: "Shikoyat muvaffaqiyatli yuborildi", complaint });
+  } catch (err) {
+    console.error("Complaint error:", err.message);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
