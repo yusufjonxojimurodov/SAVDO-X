@@ -119,7 +119,9 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
       const obj = order.toObject ? order.toObject() : order;
 
       if (obj.product) {
-        const productObj = obj.product.toObject ? obj.product.toObject() : obj.product;
+        const productObj = obj.product.toObject
+          ? obj.product.toObject()
+          : obj.product;
 
         if (productObj._id && productObj.image && productObj.image.data) {
           productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
@@ -140,7 +142,6 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
   }
 });
 
-
 router.get("/my-pending/seller", tokenCheck, async (req, res) => {
   try {
     const pendingOrders = await PendingProduct.find({
@@ -149,7 +150,27 @@ router.get("/my-pending/seller", tokenCheck, async (req, res) => {
       .populate("buyer", "name userName")
       .populate("product");
 
-    res.json(pendingOrders);
+    const formattedOrders = pendingOrders.map((order) => {
+      const obj = order.toObject ? order.toObject() : order;
+
+      if (obj.product) {
+        const productObj = obj.product.toObject
+          ? obj.product.toObject()
+          : obj.product;
+
+        if (productObj._id && productObj.image && productObj.image.data) {
+          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        } else {
+          productObj.image = null;
+        }
+
+        obj.product = productObj;
+      }
+
+      return obj;
+    });
+
+    res.json(formattedOrders);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server xatosi" });
