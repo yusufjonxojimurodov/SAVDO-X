@@ -354,29 +354,6 @@ router.get("/product/:id/image", async (req, res) => {
   }
 });
 
-const escapeMarkdown = (text) => {
-  if (!text) return "";
-  return text
-    .replace(/_/g, "\\_")
-    .replace(/\*/g, "\\*")
-    .replace(/\[/g, "\\[")
-    .replace(/]/g, "\\]")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)")
-    .replace(/~/g, "\\~")
-    .replace(/`/g, "\\`")
-    .replace(/>/g, "\\>")
-    .replace(/#/g, "\\#")
-    .replace(/\+/g, "\\+")
-    .replace(/-/g, "\\-")
-    .replace(/=/g, "\\=")
-    .replace(/\|/g, "\\|")
-    .replace(/\{/g, "\\{")
-    .replace(/\}/g, "\\}")
-    .replace(/\./g, "\\.")
-    .replace(/!/g, "\\!");
-};
-
 router.post("/complaint/:productId", tokenCheck, async (req, res) => {
   try {
     const { productId } = req.params;
@@ -384,13 +361,12 @@ router.post("/complaint/:productId", tokenCheck, async (req, res) => {
 
     const product = await ProductModel.findById(productId).populate(
       "createdBy",
-      "chatId userName name phone surname"
+      "chatId userName name surname phone"
     );
     if (!product) {
       return res.status(404).json({ message: "Mahsulot topilmadi" });
     }
 
-    // complaint saqlash
     const complaint = new Complaint({
       product: product._id,
       productName: product.name,
@@ -417,22 +393,20 @@ router.post("/complaint/:productId", tokenCheck, async (req, res) => {
 
     await complaint.save();
 
-    // Telegramga yuboriladigan xabar
     if (product.createdBy.chatId) {
       const complaintMsg =
-        `⚠️ *Mahsulotga shikoyat!* ⚠️\n\n` +
-        `📦 Mahsulot: *${escapeMarkdown(product.name)}*\n` +
-        `🔖 Turi: ${escapeMarkdown(product.type || "-")}\n` +
-        `📌 Model: ${escapeMarkdown(product.model || "-")}\n\n` +
-        `👤 Shikoyatchi: ${escapeMarkdown(name + " " + surname)}\n` +
-        `📞 Telefon: ${escapeMarkdown(phone)}\n` +
-        `🔗 Username: ${userName ? "@" + escapeMarkdown(userName) : "Anonim"}\n\n` +
-        `💬 Xabar:\n${escapeMarkdown(message)}`;
+        `⚠️ Mahsulotga shikoyat ⚠️\n\n` +
+        `📦 Mahsulot: ${product.name}\n` +
+        `🔖 Turi: ${product.type || "-"}\n` +
+        `📌 Model: ${product.model || "-"}\n\n` +
+        `👤 Shikoyatchi: ${name} ${surname}\n` +
+        `📞 Telefon: ${phone}\n` +
+        `🔗 Username: ${userName ? "@" + userName : "Anonim"}\n\n` +
+        `💬 Xabar:\n${message}`;
 
       try {
-        await bot.sendMessage(product.createdBy.chatId, complaintMsg, {
-          parse_mode: "MarkdownV2",
-        });
+        // Oddiy matn yuborilyapti, parse_mode ishlatilmaydi
+        await bot.sendMessage(product.createdBy.chatId, complaintMsg);
       } catch (err) {
         console.error("Botga xabar yuborilmadi:", err.message);
       }
@@ -446,7 +420,5 @@ router.post("/complaint/:productId", tokenCheck, async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
-
-
 
 module.exports = router;
