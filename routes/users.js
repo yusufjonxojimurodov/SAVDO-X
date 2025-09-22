@@ -5,7 +5,7 @@ const tokenCheck = require("../middleware/token.js");
 const bcrypt = require("bcrypt");
 const User = require("../models/userRegister.js");
 const jwt = require("jsonwebtoken");
-const complaint = require("../models/complaint.models.js");
+const Complaint = require("../models/complaint.models.js");
 
 require("dotenv").config();
 
@@ -316,7 +316,7 @@ router.get("/:id", async (req, res) => {
 router.get(
   "/my/complaints",
   tokenCheck,
-  permission(["seller"]),
+  permission(["seller", "admin"]),
   async (req, res) => {
     try {
       const sellerId = req.userId;
