@@ -260,7 +260,7 @@ router.put(
   upload.single("image"),
   async (req, res) => {
     try {
-      const { name, description, price, left, model, discount, type } =
+      const { name, description, price, left, model, discount, type, image } =
         req.body;
       const productId = req.params.id;
       const userId = req.userId;
@@ -277,14 +277,15 @@ router.put(
           .json({ message: "Sizda bu mahsulotni tahrirlash huquqi yo‘q" });
       }
 
-      if (req.file) {
+      if (req.image) {
         product.image = {
-          data: req.file.buffer,
-          contentType: req.file.mimetype,
+          data: req.image.buffer,
+          contentType: req.image.mimetype,
         };
       }
 
       product.name = name ?? product.name;
+      product.image = image ?? product.image
       product.description = description ?? product.description;
       product.price = price ?? product.price;
       product.left = left ?? product.left;
