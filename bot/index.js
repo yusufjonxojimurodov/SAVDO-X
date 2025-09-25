@@ -58,6 +58,7 @@ const USER_MENU = {
     ["Saytimizga takliflar📃"],
     ["Savdo X saytida mahsulot sotish🛒"],
     ["Ma'lumotlarni yangilash📝"],
+    ["Kaft bilan register qilish🖐️"],
   ],
   resize_keyboard: true,
   one_time_keyboard: false,
@@ -386,7 +387,7 @@ bot.on("message", async (msg) => {
         return;
       }
 
-      const broadcastText = msg.caption || msg.text || ""; 
+      const broadcastText = msg.caption || msg.text || "";
       const photo = msg.photo ? msg.photo[msg.photo.length - 1].file_id : null;
       const document = msg.document ? msg.document.file_id : null;
       const video = msg.video ? msg.video.file_id : null;
@@ -493,6 +494,34 @@ bot.on("message", async (msg) => {
     return;
   }
 
+  
+  if (text === "Kaft bilan register qilish🖐️") {
+    const user = await User.findOne({ chatId });
+    if (!user) {
+      bot.sendMessage(
+        chatId,
+        "❌ Avval ro‘yxatdan o‘tishingiz kerak. /start ni bosing."
+      );
+      return;
+    }
+    userSteps[chatId] = "askPalm";
+    bot.sendMessage(
+      chatId,
+      "Iltimos, kaftingizni rasmga olib yuboring (kamera orqali foto yuboring)."
+    );
+    return;
+  }
+
+  const step = userSteps[chatId];
+  
+  if (step === "askPalm") {
+    bot.sendMessage(
+      chatId,
+      "Iltimos, faqat kaft rasm (photo) yuboring. Agar kameringiz orqali yuborayotgan bo'lsangiz, 'Attach photo' orqali yuboring."
+    );
+    return;
+  }
+
   const uState = userStates[chatId];
 
   if (uState?.type === "contactAdmin") {
@@ -574,6 +603,71 @@ bot.on("message", async (msg) => {
     );
     delete userStates[chatId];
     return;
+  }
+});
+
+bot.on("photo", async (msg) => {
+  const chatId = msg.chat.id;
+  const step = userSteps[chatId];
+
+  // faqat askPalm bosqichida rasmni qabul qilamiz
+  if (step !== "askPalm") {
+    // Agar siz istasangiz, boshqa joyda kelgan fotoni boshqa maqsadga ishlatishingiz mumkin
+    return;
+  }
+
+  try {
+    // Telegram bilan kelgan eng yuqori rezolyutsiyadagi photo array oxiri file_id bo'ladi
+    const photos = msg.photo;
+    if (!photos || photos.length === 0) {
+      bot.sendMessage(
+        chatId,
+        "Iltimos, kaftning aniq rasmni yuboring (photo sifatida)."
+      );
+      return;
+    }
+
+    // eng katta rasmni tanlaymiz
+    const fileId = photos[photos.length - 1].file_id;
+
+    // file link olish (node-telegram-bot-api)
+    const fileLink = await bot.getFileLink(fileId); // returns a URL
+
+    // rasmni yuklab olish uchun axios ishlatamiz
+    const resp = await axios.get(fileLink, { responseType: "arraybuffer" });
+    const buffer = Buffer.from(resp.data, "binary");
+
+    // DB da userni topib yangilaymiz
+    const user = await User.findOne({ chatId });
+    if (!user) {
+      bot.sendMessage(
+        chatId,
+        "❌ Foydalanuvchi topilmadi. Avval ro‘yxatdan o‘ting."
+      );
+      delete userSteps[chatId];
+      return;
+    }
+
+    // Saqlash: user.palm va palmRegistered=true
+    user.palm = {
+      data: buffer,
+      contentType: resp.headers["content-type"] || "image/jpeg",
+    };
+    user.palmRegistered = true;
+    await user.save();
+
+    delete userSteps[chatId];
+
+    bot.sendMessage(
+      chatId,
+      "✅ Kaft rasm qabul qilindi va bazaga saqlandi. Rahmat!"
+    );
+  } catch (err) {
+    console.error("Photo handling error:", err);
+    bot.sendMessage(
+      chatId,
+      "❌ Rasmni qabul qilishda xatolik yuz berdi. Qayta yuboring."
+    );
   }
 });
 

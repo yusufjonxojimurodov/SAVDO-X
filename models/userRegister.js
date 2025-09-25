@@ -46,6 +46,14 @@ const schemaCreateAccount = new mongoose.Schema({
     type: Number,
     default: null,
   },
+  palm: {
+    data: Buffer,
+    contentType: String,
+  },
+  palmRegistered: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 schemaCreateAccount.pre("save", async function (next) {
