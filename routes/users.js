@@ -9,17 +9,18 @@ const Complaint = require("../models/complaint.models.js");
 
 require("dotenv").config();
 
-router.post("/login", async (req, res) => {
+router.post("/login/palm", async (req, res) => {
   try {
-    console.log("userId from token:", req.userId);
-    const { phone, password } = req.body;
+    const { phone } = req.body;
+    const palmImage = req.file.buffer;
+    const palmHash = crypto.createHash("sha256").update(palmImage).digest("hex");
 
     const user = await User.findOne({ phone });
-    if (!user)
-      return res.status(400).json({ message: "Telefon raqam notog‘ri" });
+    if (!user) return res.status(400).json({ message: "Telefon raqam notog‘ri" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Parol xato" });
+    if (user.palmHash !== palmHash) {
+      return res.status(400).json({ message: "Kaft mos kelmadi" });
+    }
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -41,7 +42,6 @@ router.post("/login", async (req, res) => {
 
 router.get("/getUserMe", tokenCheck, async (req, res) => {
   try {
-    // token middleware orqali userId olinadi
     const userId = req.userId;
 
     if (!userId) {

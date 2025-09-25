@@ -5,6 +5,7 @@ const User = require("../models/userRegister.js");
 const mongoose = require("mongoose");
 const PendingProduct = require("../models/pending.products.js");
 const axios = require("axios");
+const crypto = require("crypto");
 
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
@@ -494,7 +495,6 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  
   if (text === "Kaft bilan register qilish🖐️") {
     const user = await User.findOne({ chatId });
     if (!user) {
@@ -513,7 +513,7 @@ bot.on("message", async (msg) => {
   }
 
   const step = userSteps[chatId];
-  
+
   if (step === "askPalm") {
     bot.sendMessage(
       chatId,
@@ -610,34 +610,24 @@ bot.on("photo", async (msg) => {
   const chatId = msg.chat.id;
   const step = userSteps[chatId];
 
-  // faqat askPalm bosqichida rasmni qabul qilamiz
-  if (step !== "askPalm") {
-    // Agar siz istasangiz, boshqa joyda kelgan fotoni boshqa maqsadga ishlatishingiz mumkin
-    return;
-  }
+  if (step !== "askPalm") return;
 
   try {
-    // Telegram bilan kelgan eng yuqori rezolyutsiyadagi photo array oxiri file_id bo'ladi
     const photos = msg.photo;
     if (!photos || photos.length === 0) {
-      bot.sendMessage(
-        chatId,
-        "Iltimos, kaftning aniq rasmni yuboring (photo sifatida)."
-      );
+      bot.sendMessage(chatId, "Iltimos, kaftning aniq rasmni yuboring.");
       return;
     }
 
-    // eng katta rasmni tanlaymiz
     const fileId = photos[photos.length - 1].file_id;
+    const fileLink = await bot.getFileLink(fileId);
 
-    // file link olish (node-telegram-bot-api)
-    const fileLink = await bot.getFileLink(fileId); // returns a URL
-
-    // rasmni yuklab olish uchun axios ishlatamiz
     const resp = await axios.get(fileLink, { responseType: "arraybuffer" });
     const buffer = Buffer.from(resp.data, "binary");
 
-    // DB da userni topib yangilaymiz
+    // 🔑 HASH hisoblaymiz
+    const palmHash = crypto.createHash("sha256").update(buffer).digest("hex");
+
     const user = await User.findOne({ chatId });
     if (!user) {
       bot.sendMessage(
@@ -648,11 +638,8 @@ bot.on("photo", async (msg) => {
       return;
     }
 
-    // Saqlash: user.palm va palmRegistered=true
-    user.palm = {
-      data: buffer,
-      contentType: resp.headers["content-type"] || "image/jpeg",
-    };
+    // endi buffer o‘rniga faqat hashni saqlaymiz
+    user.palmHash = palmHash;
     user.palmRegistered = true;
     await user.save();
 
@@ -660,7 +647,7 @@ bot.on("photo", async (msg) => {
 
     bot.sendMessage(
       chatId,
-      "✅ Kaft rasm qabul qilindi va bazaga saqlandi. Rahmat!"
+      "✅ Kaft rasm qabul qilindi va hash qilib bazaga saqlandi."
     );
   } catch (err) {
     console.error("Photo handling error:", err);
