@@ -46,9 +46,9 @@ const schemaCreateAccount = new mongoose.Schema({
     type: Number,
     default: null,
   },
-  palm: {
-    data: Buffer,
-    contentType: String,
+  palmFeature: {
+    type: [Number],
+    default: null,
   },
   palmRegistered: {
     type: Boolean,

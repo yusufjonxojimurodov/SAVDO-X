@@ -5,7 +5,8 @@ const User = require("../models/userRegister.js");
 const mongoose = require("mongoose");
 const PendingProduct = require("../models/pending.products.js");
 const axios = require("axios");
-const crypto = require("crypto");
+const sharp = require('sharp');
+const crypto = require('crypto');
 
 const token = process.env.BOT_TOKEN;
 const URL = process.env.URL;
@@ -606,55 +607,86 @@ bot.on("message", async (msg) => {
   }
 });
 
-bot.on("photo", async (msg) => {
+function computeLBPFromGray(gray, w=128, h=128){
+  // same logic as client: ignore border -> size (126*126)
+  const codes = new Uint8Array((w-2)*(h-2));
+  let idx = 0;
+  for (let y=1;y<h-1;y++){
+    for (let x=1;x<w-1;x++){
+      const center = gray[y*w + x];
+      let code = 0;
+      const neighbors = [
+        gray[(y-1)*w + (x-1)],
+        gray[(y-1)*w + (x)],
+        gray[(y-1)*w + (x+1)],
+        gray[(y)*w + (x+1)],
+        gray[(y+1)*w + (x+1)],
+        gray[(y+1)*w + (x)],
+        gray[(y+1)*w + (x-1)],
+        gray[(y)*w + (x-1)]
+      ];
+      for (let k=0;k<8;k++){
+        if (neighbors[k] >= center) code |= (1 << k);
+      }
+      codes[idx++] = code;
+    }
+  }
+  return codes;
+}
+function lbpHistogramNormalized(codes){
+  const hist = new Array(256).fill(0);
+  for (let i=0;i<codes.length;i++) hist[codes[i]]++;
+  const s = codes.length || 1;
+  for (let i=0;i<256;i++) hist[i] /= s; // L1-normalize (sum=1)
+  return hist;
+}
+
+bot.on('photo', async (msg) => {
   const chatId = msg.chat.id;
   const step = userSteps[chatId];
-
-  if (step !== "askPalm") return;
+  if (step !== 'askPalm') return;
 
   try {
     const photos = msg.photo;
     if (!photos || photos.length === 0) {
-      bot.sendMessage(chatId, "Iltimos, kaftning aniq rasmni yuboring.");
+      bot.sendMessage(chatId, 'Iltimos aniq kaft rasmini yuboring (photo).');
       return;
     }
-
-    const fileId = photos[photos.length - 1].file_id;
+    const fileId = photos[photos.length -1].file_id;
     const fileLink = await bot.getFileLink(fileId);
+    const resp = await axios.get(fileLink, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(resp.data, 'binary');
 
-    const resp = await axios.get(fileLink, { responseType: "arraybuffer" });
-    const buffer = Buffer.from(resp.data, "binary");
+    // Simple check: ensure image content-type (optional, but useful)
+    // (resp.headers['content-type'] may be undefined via bot.getFileLink route; skip if not present)
 
-    // 🔑 HASH hisoblaymiz
-    const palmHash = crypto.createHash("sha256").update(buffer).digest("hex");
+    // Use sharp: resize to 128x128, grayscale, get raw pixels
+    const w = 128, h = 128;
+    const sharpImg = sharp(buffer).resize(w, h, { fit: 'cover' }).greyscale();
+    // raw() returns { data: <Buffer>, info: { width, height, channels } }
+    const raw = await sharpImg.raw().toBuffer({ resolveWithObject: true });
+    const grayBuffer = raw.data; // Uint8Array of length w*h (since greyscale channels=1)
+    // compute LBP and histogram
+    const codes = computeLBPFromGray(grayBuffer, w, h);
+    const hist = lbpHistogramNormalized(codes); // length 256
 
+    // Save to DB
     const user = await User.findOne({ chatId });
     if (!user) {
-      bot.sendMessage(
-        chatId,
-        "❌ Foydalanuvchi topilmadi. Avval ro‘yxatdan o‘ting."
-      );
+      bot.sendMessage(chatId, '❌ Foydalanuvchi topilmadi. /start bilan ro‘yxatdan o‘ting.');
       delete userSteps[chatId];
       return;
     }
 
-    // endi buffer o‘rniga faqat hashni saqlaymiz
-    user.palmHash = palmHash;
+    user.palmFeature = hist;      // store array of 256 floats
     user.palmRegistered = true;
     await user.save();
 
     delete userSteps[chatId];
-
-    bot.sendMessage(
-      chatId,
-      "✅ Kaft rasm qabul qilindi va hash qilib bazaga saqlandi."
-    );
+    bot.sendMessage(chatId, '✅ Kaft ro‘yxatdan o‘tildi. Endi web yoki bot orqali palm login ishlaydi.');
   } catch (err) {
-    console.error("Photo handling error:", err);
-    bot.sendMessage(
-      chatId,
-      "❌ Rasmni qabul qilishda xatolik yuz berdi. Qayta yuboring."
-    );
+    console.error('photo handler err', err);
+    bot.sendMessage(chatId, '❌ Rasmni qayta ishlashda xatolik. Qayta yuboring.');
   }
 });
 

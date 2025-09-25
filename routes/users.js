@@ -8,19 +8,81 @@ const jwt = require("jsonwebtoken");
 const Complaint = require("../models/complaint.models.js");
 
 require("dotenv").config();
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-router.post("/login/palm", async (req, res) => {
+function extractPalmFeature(buffer) {
+  const crypto = require("crypto");
+  const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+
+  return hash.split("").map(ch => ch.charCodeAt(0) % 10);
+}
+
+function compareFeatures(f1, f2) {
+  if (!f1 || !f2) return Infinity;
+  const len = Math.min(f1.length, f2.length);
+  let diff = 0;
+  for (let i = 0; i < len; i++) {
+    diff += Math.abs(f1[i] - f2[i]);
+  }
+  return diff / len; 
+}
+
+router.post("/login/palm", upload.single("palm"), async (req, res) => {
   try {
     const { phone } = req.body;
-    const palmImage = req.file.buffer;
-    const palmHash = crypto.createHash("sha256").update(palmImage).digest("hex");
+    const palmImage = req.file?.buffer;
+
+    if (!phone || !palmImage) {
+      return res.status(400).json({ message: "Telefon raqam va rasm yuborish shart" });
+    }
 
     const user = await User.findOne({ phone });
     if (!user) return res.status(400).json({ message: "Telefon raqam notog‘ri" });
 
-    if (user.palmHash !== palmHash) {
-      return res.status(400).json({ message: "Kaft mos kelmadi" });
+    if (!user.palmRegistered || !user.palmFeature) {
+      return res.status(400).json({ message: "Kaft avval ro‘yxatdan o‘tkazilmagan" });
     }
+
+    const loginFeature = extractPalmFeature(palmImage);
+
+    const diff = compareFeatures(user.palmFeature, loginFeature);
+
+    if (diff > 5) { 
+      return res.status(400).json({ message: "❌ Kaft mos kelmadi" });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_TOKEN,
+      { expiresIn: "24h" }
+    );
+
+    res.json({
+      message: "✅ Kaft orqali tizimga kirildi",
+      token,
+      name: user.name,
+      surname: user.surname,
+      phone: user.phone,
+      role: user.role,
+    });
+  } catch (error) {
+    console.error("Palm login error:", error);
+    res.status(500).json({ message: "Server xatoligi" });
+  }
+});
+
+router.post("/login", async (req, res) => {
+  try {
+    console.log("userId from token:", req.userId);
+    const { phone, password } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user)
+      return res.status(400).json({ message: "Telefon raqam notog‘ri" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Parol xato" });
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -33,7 +95,6 @@ router.post("/login/palm", async (req, res) => {
       name: user.name,
       surname: user.surname,
       phone: user.phone,
-      role: user.role,
     });
   } catch (error) {
     res.status(500).json({ message: "Server xatoligi" });
