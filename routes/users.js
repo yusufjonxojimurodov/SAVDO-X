@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const User = require("../models/userRegister.js");
 const jwt = require("jsonwebtoken");
 const Complaint = require("../models/complaint.models.js");
+const multer = require("multer");
 
 require("dotenv").config();
 const storage = multer.memoryStorage();
