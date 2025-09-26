@@ -648,8 +648,7 @@ bot.on("photo", async (msg) => {
   try {
     const photos = msg.photo;
     if (!photos || photos.length === 0) {
-      bot.sendMessage(chatId, "Iltimos aniq kaft rasmini yuboring (photo).");
-      return;
+      return bot.sendMessage(chatId, "Iltimos aniq kaft/yuza rasmini yuboring.");
     }
 
     const fileId = photos[photos.length - 1].file_id;
@@ -657,8 +656,7 @@ bot.on("photo", async (msg) => {
     const resp = await axios.get(fileLink, { responseType: "arraybuffer" });
     const buffer = Buffer.from(resp.data, "binary");
 
-    const w = 128,
-      h = 128;
+    const w = 128, h = 128;
     const sharpImg = sharp(buffer).resize(w, h, { fit: "cover" }).greyscale();
     const raw = await sharpImg.raw().toBuffer({ resolveWithObject: true });
     const grayBuffer = raw.data;
@@ -668,32 +666,25 @@ bot.on("photo", async (msg) => {
 
     let user = await User.findOne({ chatId });
     if (!user) {
-      bot.sendMessage(
-        chatId,
-        "❌ Foydalanuvchi topilmadi. /start bilan ro‘yxatdan o‘ting."
-      );
+      bot.sendMessage(chatId, "❌ Foydalanuvchi topilmadi. /start bilan ro‘yxatdan o‘ting.");
       delete userSteps[chatId];
       return;
     }
 
     user.faceFeature = hist;
-    if (!user.faceRegistered) user.faceRegistered = true;
+    user.faceRegistered = true;
 
     await user.save();
 
     delete userSteps[chatId];
-    bot.sendMessage(
-      chatId,
-      "✅ Yuz ro‘yxatdan o‘tildi/yangilandi"
-    );
+    bot.sendMessage(chatId, "✅ Yuz muvaffaqiyatli ro‘yxatdan o‘tildi/yangilandi");
+
   } catch (err) {
     console.error("photo handler err", err);
-    bot.sendMessage(
-      chatId,
-      "❌ Rasmni qayta ishlashda xatolik. Qayta yuboring."
-    );
+    bot.sendMessage(chatId, "❌ Rasmni qayta ishlashda xatolik. Qayta yuboring.");
   }
 });
+
 
 bot.on("callback_query", async (query) => {
   const chatId = query.message.chat.id;

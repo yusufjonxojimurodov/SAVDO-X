@@ -38,12 +38,25 @@ function computeLBPFromGray(gray, w = 128, h = 128) {
   }
   return codes;
 }
+
 function lbpHistogramNormalized(codes) {
   const hist = new Array(256).fill(0);
   for (let i = 0; i < codes.length; i++) hist[codes[i]]++;
   const s = codes.length || 1;
   for (let i = 0; i < 256; i++) hist[i] /= s;
   return hist;
+}
+
+function cosineSimilarity(a, b) {
+  let dot = 0,
+    normA = 0,
+    normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 router.post("/login/face", upload.single("face"), async (req, res) => {
@@ -78,14 +91,9 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
     const codes = computeLBPFromGray(grayBuffer, w, h);
     const hist = lbpHistogramNormalized(codes);
 
-    let diff = 0;
-    for (let i = 0; i < hist.length; i++) {
-      diff += Math.abs(hist[i] - user.faceFeature[i]);
-    }
+    const similarity = cosineSimilarity(hist, user.faceFeature);
 
-    const avgDiff = diff / hist.length;
-
-    if (avgDiff > 0.02) {
+    if (similarity < 0.85) {
       return res.status(400).json({ message: "Yuz mos kelmadi" });
     }
 
@@ -95,7 +103,7 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    res.json({
+    return res.json({
       message: "Yuz orqali tizimga kirildi",
       token,
       name: user.name,
@@ -105,7 +113,7 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
     });
   } catch (err) {
     console.error("Face login error:", err);
-    res.status(500).json({ message: "Server xatoligi" });
+    return res.status(500).json({ message: "Server xatoligi" });
   }
 });
 
