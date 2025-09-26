@@ -93,7 +93,7 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
 
     const similarity = cosineSimilarity(hist, user.faceFeature);
 
-    if (similarity < 0.85) {
+    if (similarity < 0.94) {
       return res.status(400).json({ message: "Yuz mos kelmadi" });
     }
 
