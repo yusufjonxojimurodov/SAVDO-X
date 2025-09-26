@@ -16,9 +16,9 @@ const upload = multer({ storage });
 router.post("/login/face", upload.single("face"), async (req, res) => {
   try {
     const { phone } = req.body;
-    const palmImage = req.file?.buffer;
+    const faceImage = req.file?.buffer;
 
-    if (!phone || !palmImage) {
+    if (!phone || !faceImage) {
       return res
         .status(400)
         .json({ message: "Telefon raqam va yuzni yuborish shart" });
@@ -28,7 +28,7 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
     if (!user)
       return res.status(400).json({ message: "Telefon raqam notog‘ri" });
 
-    if (!user.palmRegistered || !user.palmFeature) {
+    if (!user.faceRegistered || !user.faceFeature) {
       return res
         .status(400)
         .json({ message: "Yuz avval ro‘yxatdan o‘tkazilmagan" });
@@ -36,7 +36,7 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
 
     const w = 128,
       h = 128;
-    const sharpImg = sharp(palmImage)
+    const sharpImg = sharp(faceImage)
       .resize(w, h, { fit: "cover" })
       .greyscale();
     const raw = await sharpImg.raw().toBuffer({ resolveWithObject: true });
@@ -47,7 +47,7 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
 
     let diff = 0;
     for (let i = 0; i < hist.length; i++) {
-      diff += Math.abs(hist[i] - user.palmFeature[i]);
+      diff += Math.abs(hist[i] - user.faceFeature[i]);
     }
  
     const avgDiff = diff / hist.length;

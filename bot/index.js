@@ -60,7 +60,7 @@ const USER_MENU = {
     ["Saytimizga takliflar📃"],
     ["Savdo X saytida mahsulot sotish🛒"],
     ["Ma'lumotlarni yangilash📝"],
-    ["Kaft bilan register qilish🖐️"],
+    ["Yuz bilan register qilish😁"],
   ],
   resize_keyboard: true,
   one_time_keyboard: false,
@@ -496,7 +496,7 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  if (text === "Kaft bilan register qilish🖐️") {
+  if (text === "Yuz bilan register qilish😁") {
     const user = await User.findOne({ chatId });
     if (!user) {
       bot.sendMessage(
@@ -684,7 +684,7 @@ bot.on("photo", async (msg) => {
     delete userSteps[chatId];
     bot.sendMessage(
       chatId,
-      "✅ Kaft ro‘yxatdan o‘tildi/yangilandi. Endi web yoki bot orqali palm login ishlaydi."
+      "✅ Yuz ro‘yxatdan o‘tildi/yangilandi"
     );
   } catch (err) {
     console.error("photo handler err", err);
