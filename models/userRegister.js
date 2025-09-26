@@ -46,11 +46,11 @@ const schemaCreateAccount = new mongoose.Schema({
     type: Number,
     default: null,
   },
-  palmFeature: {
+  faceFeature: {
     type: [Number],
     default: null,
   },
-  palmRegistered: {
+  faceRegistered: {
     type: Boolean,
     default: false,
   },

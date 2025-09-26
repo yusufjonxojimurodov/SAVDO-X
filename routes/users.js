@@ -7,50 +7,53 @@ const User = require("../models/userRegister.js");
 const jwt = require("jsonwebtoken");
 const Complaint = require("../models/complaint.models.js");
 const multer = require("multer");
+const sharp = require("sharp");
 
 require("dotenv").config();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-function extractPalmFeature(buffer) {
-  const crypto = require("crypto");
-  const hash = crypto.createHash("sha256").update(buffer).digest("hex");
-
-  return hash.split("").map(ch => ch.charCodeAt(0) % 10);
-}
-
-function compareFeatures(f1, f2) {
-  if (!f1 || !f2) return Infinity;
-  const len = Math.min(f1.length, f2.length);
-  let diff = 0;
-  for (let i = 0; i < len; i++) {
-    diff += Math.abs(f1[i] - f2[i]);
-  }
-  return diff / len; 
-}
-
-router.post("/login/palm", upload.single("palm"), async (req, res) => {
+router.post("/login/face", upload.single("face"), async (req, res) => {
   try {
     const { phone } = req.body;
     const palmImage = req.file?.buffer;
 
     if (!phone || !palmImage) {
-      return res.status(400).json({ message: "Telefon raqam va rasm yuborish shart" });
+      return res
+        .status(400)
+        .json({ message: "Telefon raqam va yuzni yuborish shart" });
     }
 
     const user = await User.findOne({ phone });
-    if (!user) return res.status(400).json({ message: "Telefon raqam notog‘ri" });
+    if (!user)
+      return res.status(400).json({ message: "Telefon raqam notog‘ri" });
 
     if (!user.palmRegistered || !user.palmFeature) {
-      return res.status(400).json({ message: "Kaft avval ro‘yxatdan o‘tkazilmagan" });
+      return res
+        .status(400)
+        .json({ message: "Yuz avval ro‘yxatdan o‘tkazilmagan" });
     }
 
-    const loginFeature = extractPalmFeature(palmImage);
+    const w = 128,
+      h = 128;
+    const sharpImg = sharp(palmImage)
+      .resize(w, h, { fit: "cover" })
+      .greyscale();
+    const raw = await sharpImg.raw().toBuffer({ resolveWithObject: true });
+    const grayBuffer = raw.data; 
 
-    const diff = compareFeatures(user.palmFeature, loginFeature);
+    const codes = computeLBPFromGray(grayBuffer, w, h);
+    const hist = lbpHistogramNormalized(codes); 
 
-    if (diff > 5) { 
-      return res.status(400).json({ message: "❌ Kaft mos kelmadi" });
+    let diff = 0;
+    for (let i = 0; i < hist.length; i++) {
+      diff += Math.abs(hist[i] - user.palmFeature[i]);
+    }
+ 
+    const avgDiff = diff / hist.length;
+
+    if (avgDiff > 0.02) {
+      return res.status(400).json({ message: "Yuz mos kelmadi" });
     }
 
     const token = jwt.sign(
@@ -60,15 +63,15 @@ router.post("/login/palm", upload.single("palm"), async (req, res) => {
     );
 
     res.json({
-      message: "✅ Kaft orqali tizimga kirildi",
+      message: "Yuz orqali tizimga kirildi",
       token,
       name: user.name,
       surname: user.surname,
       phone: user.phone,
       role: user.role,
     });
-  } catch (error) {
-    console.error("Palm login error:", error);
+  } catch (err) {
+    console.error("Face login error:", err);
     res.status(500).json({ message: "Server xatoligi" });
   }
 });
@@ -385,7 +388,7 @@ router.get(
 
       const complaints = await Complaint.find({ "seller.id": sellerId })
         .populate("product", "name model type")
-        .sort({ createdAt: -1 }); 
+        .sort({ createdAt: -1 });
 
       res.json({
         message: "✅ Sizga qilingan shikoyatlar",
