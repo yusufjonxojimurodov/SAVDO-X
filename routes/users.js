@@ -13,6 +13,39 @@ require("dotenv").config();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+function computeLBPFromGray(gray, w = 128, h = 128) {
+  const codes = new Uint8Array((w - 2) * (h - 2));
+  let idx = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const center = gray[y * w + x];
+      let code = 0;
+      const neighbors = [
+        gray[(y - 1) * w + (x - 1)],
+        gray[(y - 1) * w + x],
+        gray[(y - 1) * w + (x + 1)],
+        gray[y * w + (x + 1)],
+        gray[(y + 1) * w + (x + 1)],
+        gray[(y + 1) * w + x],
+        gray[(y + 1) * w + (x - 1)],
+        gray[y * w + (x - 1)],
+      ];
+      for (let k = 0; k < 8; k++) {
+        if (neighbors[k] >= center) code |= 1 << k;
+      }
+      codes[idx++] = code;
+    }
+  }
+  return codes;
+}
+function lbpHistogramNormalized(codes) {
+  const hist = new Array(256).fill(0);
+  for (let i = 0; i < codes.length; i++) hist[codes[i]]++;
+  const s = codes.length || 1;
+  for (let i = 0; i < 256; i++) hist[i] /= s;
+  return hist;
+}
+
 router.post("/login/face", upload.single("face"), async (req, res) => {
   try {
     const { phone } = req.body;
@@ -40,16 +73,16 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
       .resize(w, h, { fit: "cover" })
       .greyscale();
     const raw = await sharpImg.raw().toBuffer({ resolveWithObject: true });
-    const grayBuffer = raw.data; 
+    const grayBuffer = raw.data;
 
     const codes = computeLBPFromGray(grayBuffer, w, h);
-    const hist = lbpHistogramNormalized(codes); 
+    const hist = lbpHistogramNormalized(codes);
 
     let diff = 0;
     for (let i = 0; i < hist.length; i++) {
       diff += Math.abs(hist[i] - user.faceFeature[i]);
     }
- 
+
     const avgDiff = diff / hist.length;
 
     if (avgDiff > 0.02) {
