@@ -140,6 +140,7 @@ router.post("/login", async (req, res) => {
       name: user.name,
       surname: user.surname,
       phone: user.phone,
+      role: user.role,
     });
   } catch (error) {
     res.status(500).json({ message: "Server xatoligi" });
