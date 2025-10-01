@@ -123,10 +123,18 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
           ? obj.product.toObject()
           : obj.product;
 
-        if (productObj._id && productObj.image && productObj.image.data) {
-          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        // Agar productda images massiv bo'lsa → URL massiv yasaymiz
+        if (
+          productObj._id &&
+          productObj.images &&
+          productObj.images.length > 0
+        ) {
+          productObj.images = productObj.images.map(
+            (_, index) =>
+              `${process.env.URL}/api/products/product/${productObj._id}/image/${index}`
+          );
         } else {
-          productObj.image = null;
+          productObj.images = [];
         }
 
         obj.product = productObj;
@@ -158,10 +166,18 @@ router.get("/my-pending/seller", tokenCheck, async (req, res) => {
           ? obj.product.toObject()
           : obj.product;
 
-        if (productObj._id && productObj.image && productObj.image.data) {
-          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        // Xuddi shu yerda ham images massiv qilib yuboramiz
+        if (
+          productObj._id &&
+          productObj.images &&
+          productObj.images.length > 0
+        ) {
+          productObj.images = productObj.images.map(
+            (_, index) =>
+              `${process.env.URL}/api/products/product/${productObj._id}/image/${index}`
+          );
         } else {
-          productObj.image = null;
+          productObj.images = [];
         }
 
         obj.product = productObj;
@@ -172,7 +188,7 @@ router.get("/my-pending/seller", tokenCheck, async (req, res) => {
 
     res.json(formattedOrders);
   } catch (err) {
-    console.error(err);
+    console.error("my-pending/seller error:", err);
     res.status(500).json({ message: "Server xatosi" });
   }
 });

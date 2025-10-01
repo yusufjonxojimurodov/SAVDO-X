@@ -2,10 +2,12 @@ const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema(
   {
-    image: {
-      data: Buffer,
-      contentType: String,
-    },
+    images: [
+      {
+        data: Buffer,
+        contentType: String,
+      },
+    ],
     name: {
       type: String,
       required: [true, "Mahsulotga Nomi kirgizilishi shart !"],

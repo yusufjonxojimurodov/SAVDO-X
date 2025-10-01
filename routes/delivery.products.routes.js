@@ -107,24 +107,31 @@ router.get("/my-deliveries", tokenCheck, async (req, res) => {
       .populate("sellerId", "userName phone")
       .populate(
         "productId",
-        "name price image description discount discountPrice"
+        "name price images description discount discountPrice"
       );
 
     const formattedOrders = deliveries.map((order) => {
-      let obj = order.toObject ? order.toObject() : order; // let bo‘lishi kerak
+      let obj = order.toObject ? order.toObject() : order;
 
       if (obj.productId) {
         let productObj = obj.productId.toObject
           ? obj.productId.toObject()
           : obj.productId;
 
-        if (productObj._id && productObj.image && productObj.image.data) {
-          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        if (
+          productObj._id &&
+          productObj.images &&
+          productObj.images.length > 0
+        ) {
+          productObj.images = productObj.images.map(
+            (_, index) =>
+              `${process.env.URL}/api/products/product/${productObj._id}/image/${index}`
+          );
         } else {
-          productObj.image = null;
+          productObj.images = [];
         }
 
-        obj.productId = productObj; // productni yangilab qo‘yish kifoya
+        obj.productId = productObj;
       }
 
       return obj;
@@ -148,7 +155,7 @@ router.get("/seller/deliveries", tokenCheck, async (req, res) => {
       .populate("buyerId", "userName phone")
       .populate(
         "productId",
-        "name price image description discount discountPrice"
+        "name price images description discount discountPrice"
       );
 
     const formattedOrders = deliveries.map((order) => {
@@ -159,10 +166,17 @@ router.get("/seller/deliveries", tokenCheck, async (req, res) => {
           ? obj.productId.toObject()
           : obj.productId;
 
-        if (productObj._id && productObj.image && productObj.image.data) {
-          productObj.image = `${process.env.URL}/api/products/product/${productObj._id}/image`;
+        if (
+          productObj._id &&
+          productObj.images &&
+          productObj.images.length > 0
+        ) {
+          productObj.images = productObj.images.map(
+            (_, index) =>
+              `${process.env.URL}/api/products/product/${productObj._id}/image/${index}`
+          );
         } else {
-          productObj.image = null;
+          productObj.images = [];
         }
 
         obj.productId = productObj;

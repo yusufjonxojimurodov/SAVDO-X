@@ -44,12 +44,13 @@ router.get("/", tokenCheck, async (req, res) => {
     const filteredBasket = basket
       .filter((b) => b.product !== null)
       .map((b) => {
-        let image = null;
+        let images = null;
 
-        if (b.product.image && b.product._id) {
-          image = `${req.protocol}://${req.get("host")}/api/products/product/${
-            b.product._id
-          }/image`;
+        if (b.product._id && b.product.images) {
+          images = b.product.images.map(
+            (_, index) =>
+              `${process.env.URL}/api/products/product/${b.product._id}/image/${index}`
+          );
         }
 
         return {
@@ -60,7 +61,7 @@ router.get("/", tokenCheck, async (req, res) => {
           price: b.product.price,
           model: b.product.model,
           description: b.product.description,
-          image,
+          images,
           discount: b.product.discount || 0,
           discountPrice: b.product.discountPrice || null,
           left: b.product.left || 0,

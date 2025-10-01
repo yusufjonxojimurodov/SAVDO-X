@@ -39,7 +39,7 @@ router.post("/create/comment", tokenCheck, async (req, res) => {
     await newComment.save();
 
     const populated = await Comment.findById(newComment._id)
-      .populate("userId", "userName")
+      .populate("userId", "userName name surname")
       .populate("productId", "name");
 
     res.status(201).json(populated);

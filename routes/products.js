@@ -20,10 +20,13 @@ const formatProduct = (product) => {
     obj.discountPrice = obj.price - (obj.price * obj.discount) / 100;
   }
 
-  if (obj._id && obj.image && obj.image.data) {
-    obj.image = `${process.env.URL}/api/products/product/${obj._id}/image`;
+  if (obj._id && obj.images && obj.images.length > 0) {
+    obj.images = obj.images.map(
+      (_, index) =>
+        `${process.env.URL}/api/products/product/${obj._id}/image/${index}`
+    );
   } else {
-    obj.image = null;
+    obj.images = [];
   }
 
   return obj;
@@ -127,14 +130,14 @@ router.post(
   "/create-product",
   tokenCheck,
   permission(["admin", "seller"]),
-  upload.single("image"),
+  upload.array("images", 3),
   async (req, res) => {
     try {
       const { name, description, price, left, type, discount, model } =
         req.body;
 
-      if (!req.file) {
-        return res.status(400).json({ message: "Rasm yuklash majburiy!" });
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "Rasmlar yuklash majburiy!" });
       }
 
       const discountPrice = discount ? price - (price * discount) / 100 : price;
@@ -149,11 +152,12 @@ router.post(
         discountPrice,
         left,
         createdBy: req.userId,
-        image: {
-          data: req.file.buffer,
-          contentType: req.file.mimetype,
-        },
+        images: req.files.map((file) => ({
+          data: file.buffer,
+          contentType: file.mimetype,
+        })),
       });
+
       await newProduct.save();
 
       const populatedProduct = await ProductModel.findById(
@@ -285,7 +289,7 @@ router.put(
       }
 
       product.name = name ?? product.name;
-      product.image = image ?? product.image
+      product.image = image ?? product.image;
       product.description = description ?? product.description;
       product.price = price ?? product.price;
       product.left = left ?? product.left;
@@ -341,20 +345,29 @@ router.get("/products/admin", async (req, res) => {
   }
 });
 
-router.get("/product/:id/image", async (req, res) => {
-  try {
-    const product = await ProductModel.findById(req.params.id).select("image");
-
-    if (!product || !product.image || !product.image.data) {
-      return res.status(404).json({ message: "Mahsulot rasmi topilmadi" });
-    }
-
-    res.contentType(product.image.contentType);
-    res.send(product.image.data);
-  } catch (err) {
-    console.error("Image fetch error:", err.message);
-    res.status(500).json({ message: "Server xatosi" });
+router.get("/product/:id/image/:index", async (req, res) => {
+  const product = await ProductModel.findById(req.params.id);
+  if (!product || !product.images || product.images.length === 0) {
+    return res.status(404).send("Image not found");
   }
+
+  const index = parseInt(req.params.index, 10);
+  const image = product.images[index];
+  if (!image) return res.status(404).send("Image not found");
+
+  const etag = `"${image.data.toString("base64").slice(0, 20)}"`;
+
+  if (req.headers["if-none-match"] === etag) {
+    return res.status(304).end();
+  }
+
+  res.set({
+    "Content-Type": image.contentType,
+    "Cache-Control": "public, max-age=31536000",
+    ETag: etag,
+  });
+
+  res.send(image.data);
 });
 
 router.post("/complaint/:productId", tokenCheck, async (req, res) => {
