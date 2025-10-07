@@ -315,8 +315,7 @@ router.get(
           .json({ message: "Faqat admin bu API'ni ishlata oladi" });
       }
 
-      const { role, page = 0 } = req.query;
-      const limit = 12;
+      const { role, size, page = 0 } = req.query;
       const skip = Number(page) * limit;
 
       // 🔹 Filter
@@ -335,7 +334,7 @@ router.get(
       const users = await User.find(filter)
         .select("-password")
         .skip(skip)
-        .limit(limit)
+        .limit(size)
         .lean();
 
       const host = `${req.protocol}://${req.get("host")}`;
