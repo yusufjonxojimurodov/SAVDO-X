@@ -316,6 +316,7 @@ router.get(
       }
 
       const { role, size, page = 0 } = req.query;
+      const limit = size
       const skip = Number(page) * limit;
 
       // 🔹 Filter
@@ -334,7 +335,7 @@ router.get(
       const users = await User.find(filter)
         .select("-password")
         .skip(skip)
-        .limit(size)
+        .limit(limit)
         .lean();
 
       const host = `${req.protocol}://${req.get("host")}`;
