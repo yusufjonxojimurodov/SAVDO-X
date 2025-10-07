@@ -240,7 +240,6 @@ router.put(
       const updatedUser = await User.findByIdAndUpdate(
         req.userId,
         { $set: updateData },
-        { new: true, select: "-password" }
       );
 
       if (!updatedUser) {
@@ -317,8 +316,11 @@ router.get(
       }
 
       const { role, page = 0 } = req.query;
-      let filter = {};
+      const limit = 12;
+      const skip = Number(page) * limit;
 
+      // 🔹 Filter
+      const filter = {};
       if (role) {
         if (!["admin", "seller", "customer", "blocked"].includes(role)) {
           return res
@@ -328,23 +330,27 @@ router.get(
         filter.role = role;
       }
 
-      const limit = 12;
-      const skip = Number(page) * limit;
-
       const totalUsers = await User.countDocuments(filter);
 
       const users = await User.find(filter)
         .select("-password")
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean();
+
+      const host = `${req.protocol}://${req.get("host")}`;
+      const usersWithAvatar = users.map((user) => ({
+        ...user,
+        avatarUrl: `${host}/api/avatar/users/avatar/${user._id}/file`,
+      }));
 
       res.json({
         message: "Foydalanuvchilar ro‘yxati",
         page: Number(page),
         totalPages: Math.ceil(totalUsers / limit),
-        count: users.length,
+        count: usersWithAvatar.length,
         totalUsers,
-        users,
+        users: usersWithAvatar,
       });
     } catch (error) {
       console.error("GET /api/all/users xato:", error);
@@ -352,6 +358,7 @@ router.get(
     }
   }
 );
+
 
 router.delete(
   "/user/delete/:id",

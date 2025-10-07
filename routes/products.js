@@ -130,7 +130,7 @@ router.post(
   "/create-product",
   tokenCheck,
   permission(["admin", "seller"]),
-  upload.array("images", 3),
+  upload.array("images", 4),
   async (req, res) => {
     try {
       const { name, description, price, left, type, discount, model } =
