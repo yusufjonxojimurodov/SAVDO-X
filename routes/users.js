@@ -284,16 +284,22 @@ router.put(
       const updatedUser = await User.findByIdAndUpdate(
         id,
         { $set: updateData },
-        { new: true, select: "-password" }
-      );
+        { new: true, select: "-password -avatar" }
+      ).lean();
 
       if (!updatedUser) {
         return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
       }
 
+      const host = `${req.protocol}://${req.get("host")}`;
+      const userWithAvatar = {
+        ...updatedUser,
+        avatarUrl: `${host}/api/avatar/users/avatar/${updatedUser._id}/file`,
+      };
+
       res.json({
         message: "Foydalanuvchi ma'lumotlari yangilandi ✅",
-        user: updatedUser,
+        user: userWithAvatar,
       });
     } catch (error) {
       console.error("PUT /api/admin/update-user/:id xato:", error);
@@ -301,6 +307,7 @@ router.put(
     }
   }
 );
+
 
 router.get(
   "/all/users",
@@ -333,7 +340,7 @@ router.get(
       const totalUsers = await User.countDocuments(filter);
 
       const users = await User.find(filter)
-        .select("-password")
+        .select("-password -avatar")
         .skip(skip)
         .limit(limit)
         .lean();
