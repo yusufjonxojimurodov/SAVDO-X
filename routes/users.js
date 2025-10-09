@@ -322,12 +322,14 @@ router.get(
           .json({ message: "Faqat admin bu API'ni ishlata oladi" });
       }
 
-      const { role, size, page = 0 } = req.query;
-      const limit = size
+      const { role, size, page = 0, search } = req.query;
+      const limit = Number(size) || 10;
       const skip = Number(page) * limit;
 
       // 🔹 Filter
       const filter = {};
+
+      // 🔸 Role bo‘yicha filtr
       if (role) {
         if (!["admin", "seller", "customer", "blocked"].includes(role)) {
           return res
@@ -337,8 +339,19 @@ router.get(
         filter.role = role;
       }
 
+      // 🔸 Search (ism yoki familiya bo‘yicha qidiruv)
+      if (search && search.trim() !== "") {
+        const searchRegex = new RegExp(search.trim(), "i"); // "i" -> case-insensitive
+        filter.$or = [
+          { name: searchRegex },
+          { surname: searchRegex },
+        ];
+      }
+
+      // 🔹 Umumiy soni
       const totalUsers = await User.countDocuments(filter);
 
+      // 🔹 Foydalanuvchilarni olish
       const users = await User.find(filter)
         .select("-password -avatar")
         .skip(skip)
@@ -365,6 +378,7 @@ router.get(
     }
   }
 );
+
 
 
 router.delete(
