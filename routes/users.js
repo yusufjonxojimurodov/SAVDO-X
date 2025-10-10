@@ -179,18 +179,18 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
 router.put(
   "/update/role/:id",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (adminUser.role !== "admin") {
+      if (adminUser.role !== "admin" || adminUser.role !== "moderator") {
         return res
           .status(403)
-          .json({ message: "Faqat admin rol o‘zgartira oladi" });
+          .json({ message: "Faqat admin va moderator rol o‘zgartira oladi" });
       }
 
       const { role } = req.body;
-      if (!["admin", "seller", "customer", "blocked"].includes(role)) {
+      if (!["admin", "seller", "customer", "blocked", "moderator"].includes(role)) {
         return res.status(400).json({ message: "Yaroqsiz rol" });
       }
 
@@ -226,7 +226,7 @@ router.put(
 router.put(
   "/update-profile",
   tokenCheck,
-  permission(["admin", "seller", "customer"]),
+  permission(["admin", "seller", "customer", "moderator"]),
   async (req, res) => {
     try {
       const { name, surname, email, birthDate } = req.body;
@@ -257,15 +257,15 @@ router.put(
 router.put(
   "/admin/update-user/:id",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
 
-      if (!adminUser || adminUser.role !== "admin") {
+      if (!adminUser || adminUser.role !== "admin" || adminUser.role !== 'moderator') {
         return res
           .status(403)
-          .json({ message: "Faqat admin foydalanuvchini yangilay oladi" });
+          .json({ message: "Faqat admin yoki moderator foydalanuvchini yangilay oladi" });
       }
 
       const { id } = req.params;
@@ -312,26 +312,24 @@ router.put(
 router.get(
   "/all/users",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      if (!adminUser || adminUser.role !== "admin" || adminUser.role !== 'moderator') {
         return res
           .status(403)
-          .json({ message: "Faqat admin bu API'ni ishlata oladi" });
+          .json({ message: "Faqat admin va moderator barcha foydalanuvchilarni ko'ra oladi" });
       }
 
       const { role, size, page = 0, search } = req.query;
       const limit = Number(size) || 10;
       const skip = Number(page) * limit;
 
-      // 🔹 Filter
       const filter = {};
 
-      // 🔸 Role bo‘yicha filtr
       if (role) {
-        if (!["admin", "seller", "customer", "blocked"].includes(role)) {
+        if (!["admin", "seller", "customer", "blocked", "moderator"].includes(role)) {
           return res
             .status(400)
             .json({ message: "Noto‘g‘ri role qiymati kiritildi" });
@@ -339,19 +337,16 @@ router.get(
         filter.role = role;
       }
 
-      // 🔸 Search (ism yoki familiya bo‘yicha qidiruv)
       if (search && search.trim() !== "") {
-        const searchRegex = new RegExp(search.trim(), "i"); // "i" -> case-insensitive
+        const searchRegex = new RegExp(search.trim(), "i"); 
         filter.$or = [
           { name: searchRegex },
           { surname: searchRegex },
         ];
       }
 
-      // 🔹 Umumiy soni
       const totalUsers = await User.countDocuments(filter);
 
-      // 🔹 Foydalanuvchilarni olish
       const users = await User.find(filter)
         .select("-password -avatar")
         .skip(skip)
@@ -379,19 +374,17 @@ router.get(
   }
 );
 
-
-
 router.delete(
   "/user/delete/:id",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      if (!adminUser || adminUser.role !== "admin" || adminUser.role !== 'moderator') {
         return res
           .status(403)
-          .json({ message: "Faqat admin foydalanuvchini o‘chira oladi" });
+          .json({ message: "Faqat admin va moderator foydalanuvchini o‘chira oladi" });
       }
 
       const { id } = req.params;

@@ -31,7 +31,7 @@ const schemaCreateAccount = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ["admin", "seller", "customer", "blocked"],
+    enum: ["admin", "seller", "customer", "blocked", "moderator"],
     default: "customer",
   },
   points: {
