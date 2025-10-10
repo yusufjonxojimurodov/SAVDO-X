@@ -324,7 +324,7 @@ router.get("/products/admin", async (req, res) => {
     const skip = (page - 1) * size;
 
     const products = await ProductModel.find({})
-      .select("name description price discount discountPrice left")
+      .select("name description price discount discountPrice left model type")
       .populate("createdBy", "userName")
       .skip(skip)
       .limit(size)
