@@ -317,11 +317,15 @@ router.put(
 
 router.get("/products/admin", async (req, res) => {
   try {
-    let { page = 1, size = 10 } = req.query;
-    page = parseInt(page);
-    size = parseInt(size);
+    let { page = 0, size = 10 } = req.query;
 
-    const skip = (page - 1) * size;
+    page = Number(page);
+    size = Number(size);
+
+    if (isNaN(page) || page < 0) page = 0;
+    if (isNaN(size) || size <= 0) size = 10;
+
+    const skip = page * size;
 
     const products = await ProductModel.find({})
       .select("name description price discount discountPrice left model type")
@@ -344,6 +348,7 @@ router.get("/products/admin", async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
 
 router.get("/product/:id/image/:index", async (req, res) => {
   const product = await ProductModel.findById(req.params.id);
