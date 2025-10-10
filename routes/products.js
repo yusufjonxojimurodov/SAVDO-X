@@ -317,7 +317,7 @@ router.put(
 
 router.get("/products/admin", async (req, res) => {
   try {
-    let { page = 0, size = 10 } = req.query;
+    let { page = 0, size = 10, search, type, model } = req.query;
 
     page = Number(page);
     size = Number(size);
@@ -327,14 +327,28 @@ router.get("/products/admin", async (req, res) => {
 
     const skip = page * size;
 
-    const products = await ProductModel.find({})
+    const filter = {};
+
+    if (search) {
+      filter.name = { $regex: search, $options: "i" };
+    }
+
+    if (type) {
+      filter.type = type;
+    }
+
+    if (model) {
+      filter.model = model;
+    }
+
+    const products = await ProductModel.find(filter)
       .select("name description price discount discountPrice left model type")
       .populate("createdBy", "userName")
       .skip(skip)
       .limit(size)
       .sort({ createdAt: -1 });
 
-    const total = await ProductModel.countDocuments();
+    const total = await ProductModel.countDocuments(filter);
 
     res.json({
       page,
@@ -348,7 +362,6 @@ router.get("/products/admin", async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
-
 
 router.get("/product/:id/image/:index", async (req, res) => {
   const product = await ProductModel.findById(req.params.id);
