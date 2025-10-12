@@ -8,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const Complaint = require("../models/complaint.models.js");
 const multer = require("multer");
 const sharp = require("sharp");
+const StatisticWebsite = require("../models/statistic.website.model.js");
 
 require("dotenv").config();
 const storage = multer.memoryStorage();
@@ -119,7 +120,6 @@ router.post("/login/face", upload.single("face"), async (req, res) => {
 
 router.post("/login", async (req, res) => {
   try {
-    console.log("userId from token:", req.userId);
     const { phone, password } = req.body;
 
     const user = await User.findOne({ phone });
@@ -135,6 +135,38 @@ router.post("/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
+    const today = new Date();
+    const startOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const endOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      23,
+      59,
+      59
+    );
+
+    let stat = await StatisticWebsite.findOne({
+      date: { $gte: startOfDay, $lte: endOfDay },
+    });
+
+    if (!stat) {
+      stat = new StatisticWebsite({
+        date: today,
+        visits: 1,
+        users: 1,
+        pageViews: 1,
+      });
+    } else {
+      stat.users += 1;
+    }
+
+    await stat.save();
+
     res.json({
       token,
       name: user.name,
@@ -143,6 +175,7 @@ router.post("/login", async (req, res) => {
       role: user.role,
     });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Server xatoligi" });
   }
 });
@@ -190,7 +223,9 @@ router.put(
       }
 
       const { role } = req.body;
-      if (!["admin", "seller", "customer", "blocked", "moderator"].includes(role)) {
+      if (
+        !["admin", "seller", "customer", "blocked", "moderator"].includes(role)
+      ) {
         return res.status(400).json({ message: "Yaroqsiz rol" });
       }
 
@@ -237,10 +272,9 @@ router.put(
       if (email) updateData.email = email;
       if (birthDate) updateData.birthDate = birthDate;
 
-      const updatedUser = await User.findByIdAndUpdate(
-        req.userId,
-        { $set: updateData },
-      );
+      const updatedUser = await User.findByIdAndUpdate(req.userId, {
+        $set: updateData,
+      });
 
       if (!updatedUser) {
         return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
@@ -262,10 +296,16 @@ router.put(
     try {
       const adminUser = await User.findById(req.userId);
 
-      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== 'moderator') {
+      if (
+        !adminUser ||
+        (adminUser.role !== "admin" && adminUser.role !== "moderator")
+      ) {
         return res
           .status(403)
-          .json({ message: "Faqat admin yoki moderator foydalanuvchini yangilay oladi" });
+          .json({
+            message:
+              "Faqat admin yoki moderator foydalanuvchini yangilay oladi",
+          });
       }
 
       const { id } = req.params;
@@ -308,7 +348,6 @@ router.put(
   }
 );
 
-
 router.get(
   "/all/users",
   tokenCheck,
@@ -316,10 +355,16 @@ router.get(
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== 'moderator') {
+      if (
+        !adminUser ||
+        (adminUser.role !== "admin" && adminUser.role !== "moderator")
+      ) {
         return res
           .status(403)
-          .json({ message: "Faqat admin va moderator barcha foydalanuvchilarni ko'ra oladi" });
+          .json({
+            message:
+              "Faqat admin va moderator barcha foydalanuvchilarni ko'ra oladi",
+          });
       }
 
       const { role, size, page = 0, search } = req.query;
@@ -329,7 +374,11 @@ router.get(
       const filter = {};
 
       if (role) {
-        if (!["admin", "seller", "customer", "blocked", "moderator"].includes(role)) {
+        if (
+          !["admin", "seller", "customer", "blocked", "moderator"].includes(
+            role
+          )
+        ) {
           return res
             .status(400)
             .json({ message: "Noto‘g‘ri role qiymati kiritildi" });
@@ -338,11 +387,8 @@ router.get(
       }
 
       if (search && search.trim() !== "") {
-        const searchRegex = new RegExp(search.trim(), "i"); 
-        filter.$or = [
-          { name: searchRegex },
-          { surname: searchRegex },
-        ];
+        const searchRegex = new RegExp(search.trim(), "i");
+        filter.$or = [{ name: searchRegex }, { surname: searchRegex }];
       }
 
       const totalUsers = await User.countDocuments(filter);
@@ -381,10 +427,15 @@ router.delete(
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== 'moderator') {
+      if (
+        !adminUser ||
+        (adminUser.role !== "admin" && adminUser.role !== "moderator")
+      ) {
         return res
           .status(403)
-          .json({ message: "Faqat admin va moderator foydalanuvchini o‘chira oladi" });
+          .json({
+            message: "Faqat admin va moderator foydalanuvchini o‘chira oladi",
+          });
       }
 
       const { id } = req.params;

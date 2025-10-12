@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const StatisticWebsite = require("../models/statistic.website.model")
+const StatisticWebsite = require("../models/statistic.website.model");
 
 router.get("/", async (req, res) => {
   try {
@@ -55,6 +55,49 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Serverda xatolik yuz berdi" });
+  }
+});
+
+router.post("/track", async (req, res) => {
+  try {
+    const today = new Date();
+    const startOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const endOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      23,
+      59,
+      59
+    );
+
+    // Bugungi kun uchun statistikani topamiz yoki yangisini yaratamiz
+    let stat = await StatisticWebsite.findOne({
+      date: { $gte: startOfDay, $lte: endOfDay },
+    });
+
+    if (!stat) {
+      stat = new StatisticWebsite({
+        date: today,
+        visits: 1,
+        users: 1, // agar login yoki cookie bilan tekshirsang, shunda unique user bo‘ladi
+        pageViews: 1,
+      });
+    } else {
+      stat.visits += 1;
+      stat.pageViews += 1;
+    }
+
+    await stat.save();
+
+    res.json({ message: "Statistika yangilandi ✅" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server xatoligi" });
   }
 });
 
