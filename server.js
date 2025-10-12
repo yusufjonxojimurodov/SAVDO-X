@@ -12,6 +12,7 @@ const deliveryProducts = require("./routes/delivery.products.routes.js");
 const bannersRoutes = require("./routes/banners.routes.js");
 const montlhySales = require("./routes/montlhy.sales.router.js");
 const userRouter = require("./routes/users.js");
+const statisticWebsite = require("./routes/statistic.website.js")
 
 require("dotenv").config();
 const { bot, setupWebhook } = require("./bot/index.js");
@@ -38,6 +39,7 @@ app.use("/api/pending/products", pendingRoutes);
 app.use("/api/delivery/products", deliveryProducts);
 app.use("/api/banner", bannersRoutes);
 app.use("/api/montlhy", montlhySales);
+app.use("/api/statistic", statisticWebsite)
 
 mongoose
   .connect(process.env.MONGO_URI, {

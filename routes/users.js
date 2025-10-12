@@ -183,7 +183,7 @@ router.put(
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (adminUser.role !== "admin" || adminUser.role !== "moderator") {
+      if (adminUser.role !== "admin" && adminUser.role !== "moderator") {
         return res
           .status(403)
           .json({ message: "Faqat admin va moderator rol o‘zgartira oladi" });
@@ -262,7 +262,7 @@ router.put(
     try {
       const adminUser = await User.findById(req.userId);
 
-      if (!adminUser || adminUser.role !== "admin" || adminUser.role !== 'moderator') {
+      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== 'moderator') {
         return res
           .status(403)
           .json({ message: "Faqat admin yoki moderator foydalanuvchini yangilay oladi" });
@@ -316,7 +316,7 @@ router.get(
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (!adminUser || adminUser.role !== "admin" || adminUser.role !== 'moderator') {
+      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== 'moderator') {
         return res
           .status(403)
           .json({ message: "Faqat admin va moderator barcha foydalanuvchilarni ko'ra oladi" });
@@ -381,7 +381,7 @@ router.delete(
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
-      if (!adminUser || adminUser.role !== "admin" || adminUser.role !== 'moderator') {
+      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== 'moderator') {
         return res
           .status(403)
           .json({ message: "Faqat admin va moderator foydalanuvchini o‘chira oladi" });
