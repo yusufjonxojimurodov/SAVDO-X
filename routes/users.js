@@ -157,9 +157,7 @@ router.post("/login", async (req, res) => {
     if (!stat) {
       stat = new StatisticWebsite({
         date: today,
-        visits: 1,
         users: 1,
-        pageViews: 1,
       });
     } else {
       stat.users += 1;

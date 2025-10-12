@@ -84,8 +84,6 @@ router.post("/track", async (req, res) => {
       stat = new StatisticWebsite({
         date: today,
         visits: 1,
-        users: 1, // agar login yoki cookie bilan tekshirsang, shunda unique user bo‘ladi
-        pageViews: 1,
       });
     } else {
       stat.visits += 1;
