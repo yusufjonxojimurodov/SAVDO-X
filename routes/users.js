@@ -150,20 +150,22 @@ router.post("/login", async (req, res) => {
       59
     );
 
-    let stat = await StatisticWebsite.findOne({
-      date: { $gte: startOfDay, $lte: endOfDay },
-    });
-
-    if (!stat) {
-      stat = new StatisticWebsite({
-        date: today,
-        users: 1,
+    if (user.role !== "admin" && user.role !== "moderator") {
+      let stat = await StatisticWebsite.findOne({
+        date: { $gte: startOfDay, $lte: endOfDay },
       });
-    } else {
-      stat.users += 1;
-    }
 
-    await stat.save();
+      if (!stat) {
+        stat = new StatisticWebsite({
+          date: today,
+          users: 1,
+        });
+      } else {
+        stat.users += 1;
+      }
+
+      await stat.save();
+    }
 
     res.json({
       token,
@@ -298,12 +300,9 @@ router.put(
         !adminUser ||
         (adminUser.role !== "admin" && adminUser.role !== "moderator")
       ) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Faqat admin yoki moderator foydalanuvchini yangilay oladi",
-          });
+        return res.status(403).json({
+          message: "Faqat admin yoki moderator foydalanuvchini yangilay oladi",
+        });
       }
 
       const { id } = req.params;
@@ -357,12 +356,10 @@ router.get(
         !adminUser ||
         (adminUser.role !== "admin" && adminUser.role !== "moderator")
       ) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Faqat admin va moderator barcha foydalanuvchilarni ko'ra oladi",
-          });
+        return res.status(403).json({
+          message:
+            "Faqat admin va moderator barcha foydalanuvchilarni ko'ra oladi",
+        });
       }
 
       const { role, size, page = 0, search } = req.query;
@@ -429,11 +426,9 @@ router.delete(
         !adminUser ||
         (adminUser.role !== "admin" && adminUser.role !== "moderator")
       ) {
-        return res
-          .status(403)
-          .json({
-            message: "Faqat admin va moderator foydalanuvchini o‘chira oladi",
-          });
+        return res.status(403).json({
+          message: "Faqat admin va moderator foydalanuvchini o‘chira oladi",
+        });
       }
 
       const { id } = req.params;
