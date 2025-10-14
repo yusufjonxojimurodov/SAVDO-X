@@ -1,4 +1,4 @@
-const formatProduct = (product) => {
+function formatProduct(product) {
   const obj = product.toObject ? product.toObject() : product;
 
   if (obj.discount) {
@@ -15,6 +15,6 @@ const formatProduct = (product) => {
   }
 
   return obj;
-};
+}
 
 module.exports = formatProduct;

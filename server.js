@@ -21,9 +21,22 @@ const { setupWebhook } = require("./bot/core/webhook.js");
 setupWebhook(app);
 initBot();
 
+const allowedDomens = [
+  "https://texnobazaar.netlify.app",
+  "https://texnobazaaradmin.netlify.app",
+];
+
 app.use(
   cors({
-    origin: "*",
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS orqali kirish taqiqlangan ❌"));
+      }
+    },
     methods: ["GET", "DELETE", "POST", "PUT", "PATCH"],
     allowedHeaders: ["Authorization", "Content-Type"],
     credentials: true,
