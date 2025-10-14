@@ -3,34 +3,14 @@ const router = express.Router();
 const ProductModel = require("../models/products");
 const tokenCheck = require("../middleware/token.js");
 const multer = require("multer");
-const axios = require("axios");
-const fs = require("fs");
 const FormData = require("form-data");
 const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
 const Complaint = require("../models/complaint.models.js");
 const { bot } = require("../bot/index.js");
+const { formatProduct } = require("../middleware/format.product.js");
 
 const upload = multer({ storage: multer.memoryStorage() });
-
-const formatProduct = (product) => {
-  const obj = product.toObject ? product.toObject() : product;
-
-  if (obj.discount) {
-    obj.discountPrice = obj.price - (obj.price * obj.discount) / 100;
-  }
-
-  if (obj._id && obj.images && obj.images.length > 0) {
-    obj.images = obj.images.map(
-      (_, index) =>
-        `${process.env.URL}/api/products/product/${obj._id}/image/${index}`
-    );
-  } else {
-    obj.images = [];
-  }
-
-  return obj;
-};
 
 router.get("/", async (req, res) => {
   try {
@@ -439,7 +419,6 @@ router.post("/complaint/:productId", tokenCheck, async (req, res) => {
         `💬 Xabar:\n${message}`;
 
       try {
-        // Oddiy matn yuborilyapti, parse_mode ishlatilmaydi
         await bot.sendMessage(product.createdBy.chatId, complaintMsg);
       } catch (err) {
         console.error("Botga xabar yuborilmadi:", err.message);

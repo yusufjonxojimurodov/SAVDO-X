@@ -12,12 +12,14 @@ const deliveryProducts = require("./routes/delivery.products.routes.js");
 const bannersRoutes = require("./routes/banners.routes.js");
 const montlhySales = require("./routes/montlhy.sales.router.js");
 const userRouter = require("./routes/users.js");
-const statisticWebsite = require("./routes/statistic.website.js")
+const statisticWebsite = require("./routes/statistic.website.js");
+const { initBot } = require("./bot/index.js");
 
 require("dotenv").config();
-const { bot, setupWebhook } = require("./bot/index.js");
+const { setupWebhook } = require("./bot/core/webhook.js");
 
 setupWebhook(app);
+initBot();
 
 app.use(
   cors({
@@ -39,7 +41,7 @@ app.use("/api/pending/products", pendingRoutes);
 app.use("/api/delivery/products", deliveryProducts);
 app.use("/api/banner", bannersRoutes);
 app.use("/api/montlhy", montlhySales);
-app.use("/api/statistic", statisticWebsite)
+app.use("/api/statistic", statisticWebsite);
 
 mongoose
   .connect(process.env.MONGO_URI, {

@@ -1,4 +1,3 @@
-// routes/banner.routes.js
 const express = require("express");
 const Banner = require("../models/banners.model");
 const permission = require("../utils/roleCheck");
@@ -72,7 +71,6 @@ router.post(
   }
 );
 
-// GET /banners
 router.get("/", async (req, res) => {
   try {
     const banners = await Banner.find().populate("createdBy", "userName");

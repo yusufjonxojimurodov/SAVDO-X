@@ -14,110 +14,6 @@ require("dotenv").config();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-function computeLBPFromGray(gray, w = 128, h = 128) {
-  const codes = new Uint8Array((w - 2) * (h - 2));
-  let idx = 0;
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const center = gray[y * w + x];
-      let code = 0;
-      const neighbors = [
-        gray[(y - 1) * w + (x - 1)],
-        gray[(y - 1) * w + x],
-        gray[(y - 1) * w + (x + 1)],
-        gray[y * w + (x + 1)],
-        gray[(y + 1) * w + (x + 1)],
-        gray[(y + 1) * w + x],
-        gray[(y + 1) * w + (x - 1)],
-        gray[y * w + (x - 1)],
-      ];
-      for (let k = 0; k < 8; k++) {
-        if (neighbors[k] >= center) code |= 1 << k;
-      }
-      codes[idx++] = code;
-    }
-  }
-  return codes;
-}
-
-function lbpHistogramNormalized(codes) {
-  const hist = new Array(256).fill(0);
-  for (let i = 0; i < codes.length; i++) hist[codes[i]]++;
-  const s = codes.length || 1;
-  for (let i = 0; i < 256; i++) hist[i] /= s;
-  return hist;
-}
-
-function cosineSimilarity(a, b) {
-  let dot = 0,
-    normA = 0,
-    normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-router.post("/login/face", upload.single("face"), async (req, res) => {
-  try {
-    const { phone } = req.body;
-    const faceImage = req.file?.buffer;
-
-    if (!phone || !faceImage) {
-      return res
-        .status(400)
-        .json({ message: "Telefon raqam va yuzni yuborish shart" });
-    }
-
-    const user = await User.findOne({ phone });
-    if (!user)
-      return res.status(400).json({ message: "Telefon raqam notog‘ri" });
-
-    if (!user.faceRegistered || !user.faceFeature) {
-      return res
-        .status(400)
-        .json({ message: "Yuz avval ro‘yxatdan o‘tkazilmagan" });
-    }
-
-    const w = 128,
-      h = 128;
-    const sharpImg = sharp(faceImage)
-      .resize(w, h, { fit: "cover" })
-      .greyscale();
-    const raw = await sharpImg.raw().toBuffer({ resolveWithObject: true });
-    const grayBuffer = raw.data;
-
-    const codes = computeLBPFromGray(grayBuffer, w, h);
-    const hist = lbpHistogramNormalized(codes);
-
-    const similarity = cosineSimilarity(hist, user.faceFeature);
-
-    if (similarity < 0.94) {
-      return res.status(400).json({ message: "Yuz mos kelmadi" });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_TOKEN,
-      { expiresIn: "24h" }
-    );
-
-    return res.json({
-      message: "Yuz orqali tizimga kirildi",
-      token,
-      name: user.name,
-      surname: user.surname,
-      phone: user.phone,
-      role: user.role,
-    });
-  } catch (err) {
-    console.error("Face login error:", err);
-    return res.status(500).json({ message: "Server xatoligi" });
-  }
-});
-
 router.post("/login", async (req, res) => {
   try {
     const { phone, password } = req.body;
@@ -196,7 +92,6 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
 
     user = user.toObject();
 
-    // seller bo‘lmasa points va ratingni o‘chirish
     if (user.role !== "seller") {
       delete user.points;
       delete user.rating;

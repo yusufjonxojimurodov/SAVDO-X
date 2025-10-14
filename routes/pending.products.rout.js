@@ -39,7 +39,7 @@ router.post("/add", tokenCheck, async (req, res) => {
       //   { headers: { "User-Agent": "MyApp/1.0" } }
       // );
       // const geocodeData = await geocodeRes.json();
-      const address = "Tizim xatosi ";
+      const address = "Tizim xatosi";
 
       const pending = new PendingProduct({
         product: basketItem.product._id,
@@ -122,8 +122,7 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
         const productObj = obj.product.toObject
           ? obj.product.toObject()
           : obj.product;
-
-        // Agar productda images massiv bo'lsa → URL massiv yasaymiz
+        
         if (
           productObj._id &&
           productObj.images &&
@@ -166,7 +165,6 @@ router.get("/my-pending/seller", tokenCheck, async (req, res) => {
           ? obj.product.toObject()
           : obj.product;
 
-        // Xuddi shu yerda ham images massiv qilib yuboramiz
         if (
           productObj._id &&
           productObj.images &&
