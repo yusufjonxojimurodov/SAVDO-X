@@ -31,7 +31,7 @@ app.use(
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedDomens.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("CORS orqali kirish taqiqlangan ❌"));
