@@ -23,7 +23,7 @@ initBot();
 
 const allowedDomens = [
   "https://texnobazaar.netlify.app",
-  "https://texnobazaaradmin.netlify.app",
+  "https://texnobazaaradminn.netlify.app",
 ];
 
 app.use(
