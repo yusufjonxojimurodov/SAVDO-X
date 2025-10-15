@@ -40,6 +40,12 @@ router.post(
         return res.status(400).json({ message: "Rasm yuklash majburiy!" });
       }
 
+      if (!req.body.productUrl) {
+        return res
+          .status(400)
+          .json({ message: "productUrl yuborilishi kerak!" });
+      }
+
       const inputPath = req.file.path;
       const imageBuffer = fs.readFileSync(inputPath);
       const imageBase64 = imageBuffer.toString("base64");
@@ -58,12 +64,13 @@ router.post(
 
       const banner = new Banner({
         image: imageUrl,
+        productUrl: req.body.productUrl, 
         createdBy: req.userId,
       });
 
       await banner.save();
 
-      res.status(201).json(banner);
+      res.status(201).json(banner); 
     } catch (err) {
       console.error("Xatolik:", err);
       res.status(500).json({ message: "Server xatosi" });
@@ -80,4 +87,4 @@ router.get("/", async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
