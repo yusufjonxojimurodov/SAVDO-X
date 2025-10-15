@@ -24,6 +24,7 @@ initBot();
 const allowedDomens = [
   "https://texnobazaar.netlify.app",
   "https://texnobazaaradminn.netlify.app",
+  "http://localhost:5173",
 ];
 
 app.use(
