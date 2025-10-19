@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const StatisticWebsite = require("../models/statistic.website.model");
+const User = require("../models/userRegister.js")
 
 router.get("/", async (req, res) => {
   try {
@@ -39,6 +40,12 @@ router.get("/", async (req, res) => {
       };
     });
 
+    const totalUsersCount = await User.countDocuments();
+    const sellerCount = await User.countDocuments({ role: "seller" });
+    const customerCount = await User.countDocuments({ role: "customer" });
+    const moderatorCount = await User.countDocuments({ role: "moderator" });
+    const blockedCount = await User.countDocuments({ role: "blocked" });
+
     res.json({
       month,
       year,
@@ -46,6 +53,13 @@ router.get("/", async (req, res) => {
       totalUsers: weeklySummary.reduce((s, w) => s + w.users, 0),
       totalPageViews: weeklySummary.reduce((s, w) => s + w.pageViews, 0),
       weekly: weeklySummary,
+      usersStats: {
+        totalUsersCount,
+        sellerCount,
+        customerCount,
+        moderatorCount,
+        blockedCount,
+      },
     });
   } catch (err) {
     console.error(err);
