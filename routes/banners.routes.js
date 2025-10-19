@@ -64,15 +64,37 @@ router.post(
 
       const banner = new Banner({
         image: imageUrl,
-        productUrl: req.body.productUrl, 
+        productUrl: req.body.productUrl,
         createdBy: req.userId,
       });
 
       await banner.save();
 
-      res.status(201).json(banner); 
+      res.status(201).json(banner);
     } catch (err) {
       console.error("Xatolik:", err);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
+
+router.delete(
+  "/delete/:id",
+  tokenCheck,
+  permission(["admin"]),
+  async (req, res) => {
+    try {
+      const banner = await Banner.findById(req.params.id);
+
+      if (!banner) {
+        return res.status(404).json({ message: "Banner topilmadi!" });
+      }
+
+      await Banner.findByIdAndDelete(req.params.id);
+
+      res.json({ message: "Banner muvaffaqiyatli o‘chirildi!" });
+    } catch (err) {
+      console.error("O‘chirishda xatolik:", err);
       res.status(500).json({ message: "Server xatosi" });
     }
   }
