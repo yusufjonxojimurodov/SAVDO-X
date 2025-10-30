@@ -92,10 +92,16 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
 
     user = user.toObject();
 
+    if (user.birthDate) {
+      user.birthDate = new Date(user.birthDate).getTime();
+    }
+
     if (user.role !== "seller") {
       delete user.points;
       delete user.rating;
     }
+
+    delete user.faceFeature;
 
     res.json(user);
   } catch (error) {
@@ -103,6 +109,7 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
     res.status(500).json({ message: "Server xatoligi" });
   }
 });
+
 
 router.put(
   "/update/role/:id",
