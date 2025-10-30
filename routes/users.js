@@ -102,6 +102,7 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
     }
 
     delete user.faceFeature;
+    delete user.avatar
 
     res.json(user);
   } catch (error) {
