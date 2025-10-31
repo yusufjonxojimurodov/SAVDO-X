@@ -319,7 +319,7 @@ router.get("/products/admin", async (req, res) => {
     }
 
     const products = await ProductModel.find(filter)
-      .select("name description price discount discountPrice left model type")
+      .select("name description price discount discountPrice left model type status")
       .populate("createdBy", "userName")
       .skip(skip)
       .limit(size)
