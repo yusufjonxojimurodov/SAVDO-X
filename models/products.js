@@ -40,6 +40,10 @@ const productSchema = new mongoose.Schema(
     discountPrice: {
       type: Number,
     },
+    status: {
+      type: String,
+      enum: ["ONSALE", "NOTFORSALE"]
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

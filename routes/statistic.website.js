@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const StatisticWebsite = require("../models/statistic.website.model");
-const User = require("../models/userRegister.js")
+const User = require("../models/userRegister.js");
+const tokenCheck = require("../middleware/token.js");
 
-router.get("/", async (req, res) => {
+router.get("/", tokenCheck, async (req, res) => {
   try {
     let { month, year } = req.query;
 

@@ -8,13 +8,13 @@ const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
 const Complaint = require("../models/complaint.models.js");
 const { bot } = require("../bot/index.js");
-const  formatProduct  = require("../middleware/format.product.js");
+const formatProduct = require("../middleware/format.product.js");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/", async (req, res) => {
   try {
-    const filter = {};
+    const filter = { status: "ONSALE" }; // 🔥
 
     if (req.query.model) {
       filter.model = req.query.model;
@@ -54,7 +54,6 @@ router.get("/", async (req, res) => {
         });
 
         const total = happyCount + unhappyCount;
-
         let happyPercent = 0;
         let unhappyPercent = 0;
 
@@ -65,10 +64,7 @@ router.get("/", async (req, res) => {
 
         return {
           ...formatProduct(product),
-          rating: {
-            happy: happyPercent,
-            unhappy: unhappyPercent,
-          },
+          rating: { happy: happyPercent, unhappy: unhappyPercent },
         };
       })
     );
@@ -131,6 +127,7 @@ router.post(
         discount,
         discountPrice,
         left,
+        status: "ONSALE",
         createdBy: req.userId,
         images: req.files.map((file) => ({
           data: file.buffer,
@@ -433,5 +430,56 @@ router.post("/complaint/:productId", tokenCheck, async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
+router.put(
+  "/:id/status",
+  tokenCheck,
+  permission(["admin", "seller"]),
+  async (req, res) => {
+    try {
+      const { status } = req.body;
+      const productId = req.params.id;
+      const userId = req.userId;
+      const userRole = req.role;
+
+      if (!["ONSALE", "NOTFORSALE"].includes(status)) {
+        return res
+          .status(400)
+          .json({ message: "Status noto‘g‘ri qiymatga ega" });
+      }
+
+      const product = await ProductModel.findById(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Mahsulot topilmadi" });
+      }
+      if (
+        userRole === "seller" &&
+        product.createdBy.toString() !== userId.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Sizda bu mahsulotni o‘zgartirish huquqi yo‘q" });
+      }
+
+      product.status = status;
+      await product.save();
+
+      res.status(200).json({
+        message: `Mahsulot statusi ${
+          status === "ONSALE" ? "sotuvda" : "sotuvdan olib tashlandi"
+        }`,
+        product: {
+          id: product._id,
+          name: product.name,
+          status: product.status,
+          updatedAt: product.updatedAt,
+        },
+      });
+    } catch (err) {
+      console.error("PUT /product/:id/status error:", err.message);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
 
 module.exports = router;
