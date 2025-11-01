@@ -21,7 +21,7 @@ const { setupWebhook } = require("./bot/core/webhook.js");
 setupWebhook(app);
 initBot();
 
-const allowedDomens = ["https://texnobazaar.netlify.app", "https://texnobazaaradminn.netlify.app"];
+const allowedDomens = ["https://texnobazaar.netlify.app", "https://texnobazaaradminn.netlify.app", "http://localhost:5173"];
 
 app.use(
   cors({
