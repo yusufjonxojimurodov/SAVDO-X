@@ -167,13 +167,14 @@ router.put(
   permission(["admin", "seller", "customer", "moderator"]),
   async (req, res) => {
     try {
-      const { name, surname, email, birthDate } = req.body;
+      const { name, surname, email, birthDate, password } = req.body;
       const updateData = {};
 
       if (name) updateData.name = name;
       if (surname) updateData.surname = surname;
       if (email) updateData.email = email;
       if (birthDate) updateData.birthDate = birthDate;
+      if (password) updateData.password = password
 
       const updatedUser = await User.findByIdAndUpdate(req.userId, {
         $set: updateData,
