@@ -483,21 +483,29 @@ router.put(
   permission(["admin"]),
   async (req, res) => {
     try {
+      // image maydonini yangilashni bloklaymiz
+      const { image, ...safeData } = req.body;
+
+      // Bazada faqat image'dan tashqari maydonlarni yangilaymiz
       const updateProduct = await ProductModel.findByIdAndUpdate(
         req.params.id,
-        req.body,
+        safeData,
         { new: true }
-      );
+      ).populate("createdBy", "userName"); // faqat userName ni oladi
 
       if (!updateProduct) {
-        return res.status(400).json({
+        return res.status(404).json({
           message: "Mahsulot topilmadi",
         });
       }
 
+      // Object'ga aylantirib, image ni response'dan olib tashlaymiz
+      const productWithoutImage = updateProduct.toObject();
+      delete productWithoutImage.image;
+
       res.status(200).json({
         message: "Mahsulot yangilandi",
-        product: updateProduct,
+        product: productWithoutImage,
       });
     } catch (error) {
       console.error(error);
