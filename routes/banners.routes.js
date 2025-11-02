@@ -129,24 +129,32 @@ router.put(
   permission(["admin"]),
   async (req, res) => {
     try {
-      const updateStatusBanner = Banner.findByIdAndUpdate(
+      const { status } = req.body; 
+
+      if (!status) {
+        return res.status(400).json({ message: "Status kiritilmagan" });
+      }
+
+      const updateStatusBanner = await Banner.findByIdAndUpdate(
         req.params.id,
-        req.body.status,
-        { new: true }
+        { status },
+        { new: true, lean: true } 
       );
 
-      if (!updateStatusBanner)
-        return res.status(400).json({ message: "Banner topilmadi" });
+      if (!updateStatusBanner) {
+        return res.status(404).json({ message: "Banner topilmadi" });
+      }
 
       res.status(200).json({
         message: "Banner holati yangilandi",
-        bannerStatus: updateStatusBanner,
+        status: updateStatusBanner.status,
       });
     } catch (error) {
+      console.error("PUT /update/status/banner/:id error:", error);
       res.status(500).json({ message: "Server xatosi" });
-      console.error(error);
     }
   }
 );
+
 
 module.exports = router;
