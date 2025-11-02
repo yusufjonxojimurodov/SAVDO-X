@@ -14,64 +14,67 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/", async (req, res) => {
   try {
-    const filter = { status: "ONSALE" }; // 🔥
+    const filter = { status: "ONSALE" };
 
-    if (req.query.model) {
-      filter.model = req.query.model;
-    }
-
-    if (req.query.type) {
-      filter.type = req.query.type;
-    }
-
+    if (req.query.model) filter.model = req.query.model;
+    if (req.query.type) filter.type = req.query.type;
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: "i" };
     }
-
-    let sortOption = {};
-    if (req.query.price) {
-      if (req.query.price === "expensive") {
-        sortOption.price = -1;
-      } else if (req.query.price === "cheap") {
-        sortOption.price = 1;
-      }
-    }
+    
+    const sortOption =
+      req.query.price === "expensive"
+        ? { price: -1 }
+        : req.query.price === "cheap"
+        ? { price: 1 }
+        : {};
 
     const products = await ProductModel.find(filter)
       .populate("createdBy", "userName")
-      .sort(sortOption);
+      .sort(sortOption)
+      .lean(); 
 
-    const productsWithRating = await Promise.all(
-      products.map(async (product) => {
-        const happyCount = await Comment.countDocuments({
-          productId: product._id,
-          rating: "happy",
-        });
+    if (!products.length) {
+      return res.status(200).json([]);
+    }
 
-        const unhappyCount = await Comment.countDocuments({
-          productId: product._id,
-          rating: "unhappy",
-        });
+    const productIds = products.map((p) => p._id);
 
-        const total = happyCount + unhappyCount;
-        let happyPercent = 0;
-        let unhappyPercent = 0;
+    const ratingStats = await Comment.aggregate([
+      { $match: { productId: { $in: productIds } } },
+      {
+        $group: {
+          _id: "$productId",
+          happyCount: {
+            $sum: { $cond: [{ $eq: ["$rating", "happy"] }, 1, 0] },
+          },
+          unhappyCount: {
+            $sum: { $cond: [{ $eq: ["$rating", "unhappy"] }, 1, 0] },
+          },
+        },
+      },
+    ]);
 
-        if (total > 0) {
-          happyPercent = Math.round((happyCount / total) * 100);
-          unhappyPercent = 100 - happyPercent;
-        }
+    const ratingMap = {};
+    for (const r of ratingStats) {
+      const total = r.happyCount + r.unhappyCount;
+      const happyPercent = total ? Math.round((r.happyCount / total) * 100) : 0;
+      const unhappyPercent = 100 - happyPercent;
 
-        return {
-          ...formatProduct(product),
-          rating: { happy: happyPercent, unhappy: unhappyPercent },
-        };
-      })
-    );
+      ratingMap[r._id.toString()] = {
+        happy: happyPercent,
+        unhappy: unhappyPercent,
+      };
+    }
 
-    res.json(productsWithRating);
+    const result = products.map((product) => ({
+      ...formatProduct(product),
+      rating: ratingMap[product._id.toString()] || { happy: 0, unhappy: 0 },
+    }));
+
+    res.status(200).json(result);
   } catch (err) {
-    console.error(err);
+    console.error("GET /products error:", err);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
@@ -319,7 +322,9 @@ router.get("/products/admin", async (req, res) => {
     }
 
     const products = await ProductModel.find(filter)
-      .select("name description price discount discountPrice left model type status")
+      .select(
+        "name description price discount discountPrice left model type status"
+      )
       .populate("createdBy", "userName")
       .skip(skip)
       .limit(size)
@@ -438,46 +443,62 @@ router.put(
   async (req, res) => {
     try {
       const { status } = req.body;
-      const productId = req.params.id;
-      const userId = req.userId;
-      const userRole = req.role;
-
       if (!["ONSALE", "NOTFORSALE"].includes(status)) {
         return res
           .status(400)
           .json({ message: "Status noto‘g‘ri qiymatga ega" });
       }
 
-      const product = await ProductModel.findById(productId);
-      if (!product) {
+      const updateStatus = await ProductModel.findByIdAndUpdate(
+        req.params.id,
+        status,
+        { new: true }
+      );
+
+      if (!updateStatus) {
         return res.status(404).json({ message: "Mahsulot topilmadi" });
       }
-      if (
-        userRole === "seller" &&
-        product.createdBy.toString() !== userId.toString()
-      ) {
-        return res
-          .status(403)
-          .json({ message: "Sizda bu mahsulotni o‘zgartirish huquqi yo‘q" });
-      }
-
-      product.status = status;
-      await product.save();
 
       res.status(200).json({
         message: `Mahsulot statusi ${
-          status === "ONSALE" ? "sotuvda" : "sotuvdan olib tashlandi"
+          status === "ONSALE" ? "Sotuvga qo'yildi" : "Sotuvdan olib tashlandi"
         }`,
         product: {
-          id: product._id,
-          name: product.name,
-          status: product.status,
-          updatedAt: product.updatedAt,
+          id: updateStatus._id,
+          name: updateStatus.name,
+          status: updateStatus.status,
+          updatedAt: updateStatus.updatedAt.getTime(),
         },
       });
     } catch (err) {
       console.error("PUT /product/:id/status error:", err.message);
       res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
+
+router.put(
+  "/update/product/admin/:id",
+  tokenCheck,
+  permission(["admin"]),
+  async (req, res) => {
+    try {
+      const updateProduct = ProductModel.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        { new: true }
+      );
+
+      if (!updateProduct)
+        return res.status(400).json({
+          message: "Mahsulot topilmadi",
+          product: updateProduct,
+        });
+
+      res.status(200).json({ message: "Mahsulot yangilandi" });
+    } catch (error) {
+      res.status(500).json({ message: "Server xatosi" });
+      console.error(error);
     }
   }
 );

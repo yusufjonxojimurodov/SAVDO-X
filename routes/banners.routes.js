@@ -100,7 +100,7 @@ router.delete(
   }
 );
 
-router.get("/", async (req, res) => {
+router.get("/admin", async (req, res) => {
   try {
     const banners = await Banner.find().populate("createdBy", "userName");
     res.json(banners);
@@ -108,5 +108,45 @@ router.get("/", async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 });
+
+router.get("/", async (req, res) => {
+  try {
+    const activeBanners = await Banner.find({ status: "ACTIVE" }).populate(
+      "createdBy",
+      "userName"
+    );
+
+    res.status(200).json(activeBanners);
+  } catch (err) {
+    console.error("GET /banners/active error:", err.message);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+});
+
+router.put(
+  "/update/status/banner/:id",
+  tokenCheck,
+  permission(["admin"]),
+  async (req, res) => {
+    try {
+      const updateStatusBanner = Banner.findByIdAndUpdate(
+        req.params.id,
+        req.body.status,
+        { new: true }
+      );
+
+      if (!updateStatusBanner)
+        return res.status(400).json({ message: "Banner topilmadi" });
+
+      res.status(200).json({
+        message: "Banner holati yangilandi",
+        bannerStatus: updateStatusBanner,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Server xatosi" });
+      console.error(error);
+    }
+  }
+);
 
 module.exports = router;
