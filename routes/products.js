@@ -483,24 +483,31 @@ router.put(
   permission(["admin"]),
   async (req, res) => {
     try {
-      const updateProduct = ProductModel.findByIdAndUpdate(
+      const updateProduct = await ProductModel.findByIdAndUpdate(
         req.params.id,
         req.body,
         { new: true }
       );
 
-      if (!updateProduct)
+      if (!updateProduct) {
         return res.status(400).json({
           message: "Mahsulot topilmadi",
-          product: updateProduct,
         });
+      }
 
-      res.status(200).json({ message: "Mahsulot yangilandi", updateProduct });
+      res.status(200).json({
+        message: "Mahsulot yangilandi",
+        product: updateProduct,
+      });
     } catch (error) {
-      res.status(500).json({ message: "Server xatosi" });
       console.error(error);
+      res.status(500).json({
+        message: "Server xatosi",
+        error: error.message,
+      });
     }
   }
 );
+
 
 module.exports = router;
