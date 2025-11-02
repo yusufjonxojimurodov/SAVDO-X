@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: "i" };
     }
-    
+
     const sortOption =
       req.query.price === "expensive"
         ? { price: -1 }
@@ -32,7 +32,7 @@ router.get("/", async (req, res) => {
     const products = await ProductModel.find(filter)
       .populate("createdBy", "userName")
       .sort(sortOption)
-      .lean(); 
+      .lean();
 
     if (!products.length) {
       return res.status(200).json([]);
@@ -451,7 +451,7 @@ router.put(
 
       const updateStatus = await ProductModel.findByIdAndUpdate(
         req.params.id,
-        status,
+        { status },
         { new: true }
       );
 
@@ -508,6 +508,5 @@ router.put(
     }
   }
 );
-
 
 module.exports = router;
