@@ -439,7 +439,7 @@ router.post("/complaint/:productId", tokenCheck, async (req, res) => {
 router.put(
   "/:id/status",
   tokenCheck,
-  permission(["admin", "seller"]),
+  permission(["admin", "seller", "moderator"]),
   async (req, res) => {
     try {
       const { status } = req.body;
@@ -480,7 +480,7 @@ router.put(
 router.put(
   "/update/product/admin/:id",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   async (req, res) => {
     try {
       // image maydonini yangilashni bloklaymiz

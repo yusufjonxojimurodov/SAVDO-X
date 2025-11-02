@@ -126,7 +126,7 @@ router.get("/", async (req, res) => {
 router.put(
   "/update/status/banner/:id",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   async (req, res) => {
     try {
       const { status } = req.body; 
