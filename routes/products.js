@@ -495,7 +495,7 @@ router.put(
           product: updateProduct,
         });
 
-      res.status(200).json({ message: "Mahsulot yangilandi" });
+      res.status(200).json({ message: "Mahsulot yangilandi", updateProduct });
     } catch (error) {
       res.status(500).json({ message: "Server xatosi" });
       console.error(error);
