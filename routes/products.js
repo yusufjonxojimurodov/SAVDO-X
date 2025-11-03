@@ -8,6 +8,7 @@ const permission = require("../utils/roleCheck.js");
 const Comment = require("../models/coment.js");
 const Complaint = require("../models/complaint.models.js");
 const { bot } = require("../bot/index.js");
+const checkPermission = require("../middleware/check.permissons.js")
 const formatProduct = require("../middleware/format.product.js");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -440,6 +441,7 @@ router.put(
   "/:id/status",
   tokenCheck,
   permission(["admin", "seller", "moderator"]),
+  checkPermission("updateStatusProducts"),
   async (req, res) => {
     try {
       const { status } = req.body;
@@ -481,6 +483,7 @@ router.put(
   "/update/product/admin/:id",
   tokenCheck,
   permission(["admin", "moderator"]),
+  checkPermission("updateProducts"),
   async (req, res) => {
     try {
       const { image, price, discount, ...safeData } = req.body;

@@ -9,6 +9,7 @@ const Complaint = require("../models/complaint.models.js");
 const multer = require("multer");
 const sharp = require("sharp");
 const StatisticWebsite = require("../models/statistic.website.model.js");
+const checkPermission = require("../middleware/check.permissons.js");
 
 require("dotenv").config();
 const storage = multer.memoryStorage();
@@ -115,6 +116,7 @@ router.put(
   "/update/role/:id",
   tokenCheck,
   permission(["admin", "moderator"]),
+  checkPermission("updateRoleUsers"),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
@@ -199,6 +201,7 @@ router.put(
   "/admin/update-user/:id",
   tokenCheck,
   permission(["admin", "moderator"]),
+  checkPermission("editUsers"),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
@@ -326,6 +329,7 @@ router.delete(
   "/user/delete/:id",
   tokenCheck,
   permission(["admin", "moderator"]),
+  checkPermission("deleteUsers"),
   async (req, res) => {
     try {
       const adminUser = await User.findById(req.userId);
@@ -363,13 +367,13 @@ router.delete(
   }
 );
 
-router.get("/:id", async (req, res) => {
+router.get("/user/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     let user = await User.findById(id).select("-password");
     if (!user) {
-      return res.status(404).json({ message: "❌ User topilmadi" });
+      return res.status(404).json({ message: "User topilmadi" });
     }
 
     user = user.toObject();
@@ -393,6 +397,27 @@ router.get("/:id", async (req, res) => {
 });
 
 router.get(
+  "/moderators",
+  tokenCheck,
+  permission(["admin"]),
+  async (req, res) => {
+    try {
+      const moderators = await User.find({ role: "moderator" }).select(
+        "-password -faceFeature -avatarUrl -avatar"
+      );
+
+      res.status(200).json({
+        message: "Moderatorlar ro'yxati",
+        moderators,
+      });
+    } catch (error) {
+      console.error("GET /moderators xato:", error.message);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
+
+router.get(
   "/my/complaints",
   tokenCheck,
   permission(["seller", "admin"]),
@@ -405,12 +430,45 @@ router.get(
         .sort({ createdAt: -1 });
 
       res.json({
-        message: "✅ Sizga qilingan shikoyatlar",
+        message: "Sizga qilingan shikoyatlar",
         count: complaints.length,
         complaints,
       });
     } catch (err) {
       console.error("GET /users/my/complaints xato:", err.message);
+      res.status(500).json({ message: "Server xatosi" });
+    }
+  }
+);
+
+router.put(
+  "/permissions/moderator/:id",
+  tokenCheck,
+  permission(["admin"]),
+  async (req, res) => {
+    try {
+      const { permission } = req.body;
+
+      if (!permission || typeof permission !== "object") {
+        return res.status(400).json({ message: "Permission object required" });
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        { permission },
+        { new: true }
+      ).select("-password -avatar -avatarUrl");
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Foydalanuvchi topilmadi" });
+      }
+
+      res.json({
+        message: "Moderator ruxsatlari yangilandi",
+        user: updatedUser,
+      });
+    } catch (err) {
+      console.error("PUT /permissions/moderator/:id xato:", err.message);
       res.status(500).json({ message: "Server xatosi" });
     }
   }

@@ -6,6 +6,7 @@ const fs = require("fs");
 const axios = require("axios");
 const FormData = require("form-data");
 const jwt = require("jsonwebtoken");
+const checkPermission = require("../middleware/check.permissons.js");
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
@@ -26,6 +27,7 @@ router.post(
   "/post",
   tokenCheck,
   permission(["admin", "moderator"]),
+  checkPermission("createBanner"),
   upload.single("image"),
   async (req, res) => {
     try {
@@ -81,7 +83,8 @@ router.post(
 router.delete(
   "/delete/:id",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
+  checkPermission("deleteBanner"),
   async (req, res) => {
     try {
       const banner = await Banner.findById(req.params.id);
@@ -127,9 +130,10 @@ router.put(
   "/update/status/banner/:id",
   tokenCheck,
   permission(["admin", "moderator"]),
+  checkPermission("updateStatusBanner"),
   async (req, res) => {
     try {
-      const { status } = req.body; 
+      const { status } = req.body;
 
       if (!status) {
         return res.status(400).json({ message: "Status kiritilmagan" });
@@ -138,7 +142,7 @@ router.put(
       const updateStatusBanner = await Banner.findByIdAndUpdate(
         req.params.id,
         { status },
-        { new: true, lean: true } 
+        { new: true, lean: true }
       );
 
       if (!updateStatusBanner) {
@@ -155,6 +159,5 @@ router.put(
     }
   }
 );
-
 
 module.exports = router;

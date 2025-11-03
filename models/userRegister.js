@@ -34,6 +34,22 @@ const schemaCreateAccount = new mongoose.Schema({
     enum: ["admin", "seller", "customer", "blocked", "moderator"],
     default: "customer",
   },
+  permission: {
+    type: Object,
+    default: {
+      editUsers: false,
+      deleteUsers: false,
+      updateRoleUsers: false,
+      editProducts: false,
+      deleteProducts: false,
+      updateStatusProducts: false,
+      updateProducts: false,
+      createBanner: false,
+      updateBanner: false,
+      updateStatusBanner: false,
+      deleteBanner: false
+    }
+  },
   points: {
     type: Number,
     default: 0,
