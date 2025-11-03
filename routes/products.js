@@ -483,29 +483,39 @@ router.put(
   permission(["admin", "moderator"]),
   async (req, res) => {
     try {
-      // image maydonini yangilashni bloklaymiz
-      const { image, ...safeData } = req.body;
+      const { image, price, discount, ...safeData } = req.body;
 
-      // Bazada faqat image'dan tashqari maydonlarni yangilaymiz
-      const updateProduct = await ProductModel.findByIdAndUpdate(
-        req.params.id,
-        safeData,
-        { new: true }
-      ).populate("createdBy", "userName"); // faqat userName ni oladi
-
-      if (!updateProduct) {
+      let product = await ProductModel.findById(req.params.id);
+      if (!product) {
         return res.status(404).json({
           message: "Mahsulot topilmadi",
         });
       }
 
-      // Object'ga aylantirib, image ni response'dan olib tashlaymiz
-      const productWithoutImage = updateProduct.toObject();
-      delete productWithoutImage.image;
+      Object.assign(product, safeData);
+
+      if (price !== undefined) product.price = price;
+      if (discount !== undefined) product.discount = discount;
+
+      product.discountPrice = product.discount
+        ? product.price - (product.price * product.discount) / 100
+        : product.price;
+
+      if (image) {
+        product.image = image;
+      }
+
+      await product.save();
+
+      const updatedProduct = await ProductModel.findById(req.params.id)
+        .populate("createdBy", "userName")
+        .lean();
+
+      delete updatedProduct.image; 
 
       res.status(200).json({
         message: "Mahsulot yangilandi",
-        product: productWithoutImage,
+        product: updatedProduct,
       });
     } catch (error) {
       console.error(error);
