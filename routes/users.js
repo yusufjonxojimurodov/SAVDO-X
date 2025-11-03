@@ -102,7 +102,7 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
     }
 
     delete user.faceFeature;
-    delete user.avatar
+    delete user.avatar;
 
     res.json(user);
   } catch (error) {
@@ -110,7 +110,6 @@ router.get("/getUserMe", tokenCheck, async (req, res) => {
     res.status(500).json({ message: "Server xatoligi" });
   }
 });
-
 
 router.put(
   "/update/role/:id",
@@ -174,7 +173,11 @@ router.put(
       if (surname) updateData.surname = surname;
       if (email) updateData.email = email;
       if (birthDate) updateData.birthDate = birthDate;
-      if (password) updateData.password = password
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        updateData.password = hashedPassword;
+      }
 
       const updatedUser = await User.findByIdAndUpdate(req.userId, {
         $set: updateData,
