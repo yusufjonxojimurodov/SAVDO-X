@@ -25,7 +25,7 @@ const tokenCheck = (req, res, next) => {
 router.post(
   "/post",
   tokenCheck,
-  permission(["admin"]),
+  permission(["admin", "moderator"]),
   upload.single("image"),
   async (req, res) => {
     try {
