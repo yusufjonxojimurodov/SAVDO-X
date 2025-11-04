@@ -5,6 +5,7 @@ const cors = require("cors");
 const path = require("path");
 const productsRouter = require("./routes/products.js");
 const basketRouter = require("./routes/basketProduct.js");
+const websiteRouter = require("./routes/website.routes.js");
 const commentRouter = require("./routes/comment.rout.js");
 const avatarRouter = require("./routes/avatar.js");
 const pendingRoutes = require("./routes/pending.products.rout.js");
@@ -21,7 +22,11 @@ const { setupWebhook } = require("./bot/core/webhook.js");
 setupWebhook(app);
 initBot();
 
-const allowedDomens = ["https://texnobazaar.netlify.app", "https://texnobazaaradminn.netlify.app", "http://localhost:5173"];
+const allowedDomens = [
+  "https://texnobazaar.netlify.app",
+  "https://texnobazaaradminn.netlify.app",
+  "http://localhost:5173",
+];
 
 app.use(
   cors({
@@ -52,6 +57,7 @@ app.use("/api/delivery/products", deliveryProducts);
 app.use("/api/banner", bannersRoutes);
 app.use("/api/montlhy", montlhySales);
 app.use("/api/statistic", statisticWebsite);
+app.use("/api/website", websiteRouter);
 
 mongoose
   .connect(process.env.MONGO_URI, {
