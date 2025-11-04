@@ -83,6 +83,9 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
 
     await PendingProduct.findByIdAndDelete(pendingId);
 
+    console.log("Buyer ID:", buyer._id.toString());
+    console.log("Clients Map keys:", [...clients.keys()]);
+
     const receiver = clients.get(buyer._id.toString());
     if (receiver && receiver.readyState === 1) {
       receiver.send(
