@@ -5,6 +5,7 @@ const BasketProduct = require("../models/basketProduct.js");
 const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
 const tokenCheck = require("../middleware/token.js");
+const { clients } = require("../websocket/notifications.server.js");
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
@@ -65,6 +66,17 @@ router.post("/add", tokenCheck, async (req, res) => {
       await pending.save();
       pendingProducts.push(pending);
 
+      const receiver = clients.get(basketItem.product.createdBy._id.toString());
+      if (receiver && receiver.readyState === 1) {
+        receiver.send(
+          JSON.stringify({
+            type: "notification",
+            message: `Mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.`,
+            time: new Date().toLocaleTimeString(),
+          })
+        );
+      }
+
       try {
         await bot.sendMessage(
           basketItem.product.createdBy.chatId,
@@ -122,7 +134,7 @@ router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
         const productObj = obj.product.toObject
           ? obj.product.toObject()
           : obj.product;
-        
+
         if (
           productObj._id &&
           productObj.images &&

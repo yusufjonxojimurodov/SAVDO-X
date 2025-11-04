@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
+const http = require("http");
 const cors = require("cors");
 const path = require("path");
 const productsRouter = require("./routes/products.js");
@@ -15,6 +16,7 @@ const montlhySales = require("./routes/montlhy.sales.router.js");
 const userRouter = require("./routes/users.js");
 const statisticWebsite = require("./routes/statistic.website.js");
 const { initBot } = require("./bot/index.js");
+const { initWebSocket } = require("./websocket/notifications.server.js");
 
 require("dotenv").config();
 const { setupWebhook } = require("./bot/core/webhook.js");
@@ -59,19 +61,19 @@ app.use("/api/montlhy", montlhySales);
 app.use("/api/statistic", statisticWebsite);
 app.use("/api/website", websiteRouter);
 
+const server = http.createServer(app);
+
+initWebSocket(server);
+
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => {
-    console.log("MongoDb Muvaffaqiyatli");
-  })
-  .catch((errorMongo) => {
-    console.log(errorMongo);
-  });
+  .then(() => console.log("MongoDb Muvaffaqiyatli"))
+  .catch((err) => console.log(err));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(`Server ${PORT}-portda ishlayapti`)
-);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server va WebSocket ${PORT}-portda ishlayapti`);
+});

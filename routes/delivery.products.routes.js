@@ -6,6 +6,7 @@ const PendingProduct = require("../models/pending.products.js");
 const { bot } = require("../bot/index.js");
 const MonthlySale = require("../models/montlhy.sale.model.js");
 const tokenCheck = require("../middleware/token.js");
+const { clients } = require("../websocket/notifications.server.js");
 
 router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
   try {
@@ -81,6 +82,17 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
     await product.save();
 
     await PendingProduct.findByIdAndDelete(pendingId);
+
+    const receiver = clients.get(buyer._id.toString());
+    if (receiver && receiver.readyState === 1) {
+      receiver.send(
+        JSON.stringify({
+          type: "notification",
+          message: `Sotuvchi siz buyurtma qilgan "${product.name}" mahsulotingizni tasdiqladi`,
+          time: new Date().toLocaleTimeString(),
+        })
+      );
+    }
 
     if (buyer.chatId) {
       await bot.sendMessage(
