@@ -36,7 +36,7 @@ router.put(
   }
 );
 
-router.get("/get/platform/status", tokenCheck, async (req, res) => {
+router.get("/get/platform/status", async (req, res) => {
   try {
     const platformStatus = await WEBSITE.findOne();
 
