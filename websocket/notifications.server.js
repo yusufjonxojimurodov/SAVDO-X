@@ -26,7 +26,7 @@ function initWebSocket(server) {
             JSON.stringify({
               type: "notification",
               message: data.message,
-              time: new Date().toLocaleTimeString(),
+              time: Date.now(), 
             })
           );
           console.log(`📩 ${data.to} foydalanuvchiga yuborildi`);
