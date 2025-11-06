@@ -26,6 +26,78 @@ async function sendNotification(user, message) {
   }
 }
 
+router.post("/add", tokenCheck, async (req, res) => {
+  try {
+    const buyerId = req.user.id; 
+    const basketItems = await Basket.find({ buyer: buyerId })
+      .populate("product")
+      .populate({
+        path: "product",
+        populate: {
+          path: "createdBy",
+          select: "_id chatId",
+        },
+      });
+
+    if (!basketItems || basketItems.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Savatchada mahsulotlar mavjud emas" });
+    }
+
+    const pendingProducts = [];
+
+    for (const basketItem of basketItems) {
+      if (!basketItem.product || !basketItem.product._id) continue;
+
+      const pending = new PendingProduct({
+        buyer: buyerId,
+        product: basketItem.product._id,
+        seller: basketItem.product.createdBy._id,
+        quantity: basketItem.quantity,
+        totalPrice: basketItem.totalPrice,
+        status: "pending",
+      });
+
+      await pending.save();
+      pendingProducts.push(pending);
+
+      const receiver = clients.get(basketItem.product.createdBy._id.toString());
+      if (receiver && receiver.readyState === 1) {
+        receiver.send(
+          JSON.stringify({
+            type: "notification",
+            message: `Mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.`,
+            time: new Date().toLocaleTimeString(),
+          })
+        );
+      }
+
+      try {
+        await bot.sendMessage(
+          basketItem.product.createdBy.chatId,
+          `🛒 Mahsulotingiz "${basketItem.product.name}" uchun yangi buyurtma keldi. Tasdiqlanishi kutilmoqda.`
+        );
+      } catch (botError) {
+        console.error("Botga yuborishda xatolik:", botError.message);
+      }
+    }
+
+    await Basket.deleteMany({ buyer: buyerId });
+
+    res.status(201).json({
+      message: "Buyurtmalar muvaffaqiyatli yuborildi",
+      pendingProducts,
+    });
+  } catch (error) {
+    console.error("❌ Xatolik /add API da:", error);
+    res.status(500).json({
+      message: "Serverda xatolik yuz berdi",
+      error: error.message,
+    });
+  }
+});
+
 router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
   try {
     const { pendingId, address } = req.params;
