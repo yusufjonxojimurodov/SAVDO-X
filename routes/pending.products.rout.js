@@ -8,93 +8,129 @@ const tokenCheck = require("../middleware/token.js");
 const { clients } = require("../websocket/notifications.server.js");
 
 async function sendNotification(user, message) {
-  const time = new Date().toLocaleTimeString();
+  const time = Date.now();
 
   const wsClient = clients.get(user._id.toString());
   if (wsClient && wsClient.readyState === 1) {
-    wsClient.send(
-      JSON.stringify({
-        type: "notification",
-        message,
-        time,
-      })
-    );
+    wsClient.send(JSON.stringify({ type: "notification", message, time }));
   }
 
   if (user.chatId) {
-    await bot.sendMessage(user.chatId, message);
+    try {
+      await bot.sendMessage(user.chatId, message);
+    } catch (err) {
+      console.error("Botga xabar yuborishda xatolik:", err.message);
+    }
   }
 }
 
 router.post("/add", tokenCheck, async (req, res) => {
   try {
-    const buyerId = req.user.id; 
-    const basketItems = await Basket.find({ buyer: buyerId })
-      .populate("product")
-      .populate({
-        path: "product",
-        populate: {
-          path: "createdBy",
-          select: "_id chatId",
-        },
-      });
+    const { orders, phone, userName, location } = req.body;
 
-    if (!basketItems || basketItems.length === 0) {
+    if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return res
         .status(400)
-        .json({ message: "Savatchada mahsulotlar mavjud emas" });
+        .json({ message: "Orders array bo'sh bo'lmasligi kerak" });
+    }
+
+    if (!location || !location.lat || !location.lng) {
+      return res.status(400).json({ message: "Iltimos, marker tanlang" });
     }
 
     const pendingProducts = [];
 
-    for (const basketItem of basketItems) {
-      if (!basketItem.product || !basketItem.product._id) continue;
+    for (const order of orders) {
+      const { productId, quantity } = order;
+
+      const basketItem = await BasketProduct.findById(productId).populate({
+        path: "product",
+        populate: { path: "createdBy", select: "chatId userName" },
+      });
+
+      if (!basketItem) {
+        return res.status(404).json({ message: "Bunday mahsulot topilmadi" });
+      }
+
+      const product = basketItem.product;
+      const seller = product.createdBy;
+
+      // Mahsulot miqdorini tekshirish
+      if (!product.left || product.left < (quantity || basketItem.quantity)) {
+        await sendNotification(
+          seller,
+          `⚠️ ${product.name} mahsulotingiz omborda qolmagan!`
+        );
+        return res
+          .status(400)
+          .json({ message: "❌ Bu mahsulot sotuvda qolmagan" });
+      }
 
       const pending = new PendingProduct({
-        buyer: buyerId,
-        product: basketItem.product._id,
-        seller: basketItem.product.createdBy._id,
-        quantity: basketItem.quantity,
-        totalPrice: basketItem.totalPrice,
-        status: "pending",
+        product: product._id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        model: product.model,
+        left: product.left,
+        image: product.image,
+        createdBy: seller._id,
+        quantity: quantity || basketItem.quantity,
+        buyer: req.userId,
+        phone,
+        userName,
+        location: {
+          lat: location.lat,
+          lng: location.lng,
+          address: "Tizim xatosi", // agar reverse geocode ishlatilmasa
+        },
       });
 
       await pending.save();
       pendingProducts.push(pending);
 
-      const receiver = clients.get(basketItem.product.createdBy._id.toString());
-      if (receiver && receiver.readyState === 1) {
-        receiver.send(
-          JSON.stringify({
-            type: "notification",
-            message: `Mahsulotingiz "${basketItem.product.name}" tasdiqlanishi kutilmoqda.`,
-            time: new Date().toLocaleTimeString(),
-          })
-        );
-      }
+      // Sotuvchiga WebSocket orqali xabar
+      await sendNotification(
+        seller,
+        `📦 Mahsulotingiz "${product.name}" tasdiqlanishi kutilmoqda.`
+      );
 
-      try {
-        await bot.sendMessage(
-          basketItem.product.createdBy.chatId,
-          `🛒 Mahsulotingiz "${basketItem.product.name}" uchun yangi buyurtma keldi. Tasdiqlanishi kutilmoqda.`
-        );
-      } catch (botError) {
-        console.error("Botga yuborishda xatolik:", botError.message);
-      }
+      // Telegram orqali xabar
+      await bot.sendMessage(
+        seller.chatId,
+        `🛒 Mahsulotingiz "${
+          product.name
+        }" uchun yangi buyurtma keldi.\nMijoz👤: ${
+          userName ? "@" + userName : "Anonim"
+        }\n📞 Raqam: ${phone}\n🧺 Soni: ${
+          quantity || basketItem.quantity
+        } ta\n📍 Manzil: Tizim xatosi`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "Tasdiqlash ✅",
+                  callback_data: `approve_${pending._id}`,
+                },
+                {
+                  text: "Bekor qilish ❌",
+                  callback_data: `reject_${pending._id}`,
+                },
+              ],
+            ],
+          },
+        }
+      );
     }
 
-    await Basket.deleteMany({ buyer: buyerId });
-
     res.status(201).json({
-      message: "Buyurtmalar muvaffaqiyatli yuborildi",
+      message: "Mahsulotlar tasdiqlanishi kutilayotganlarga qo‘shildi",
       pendingProducts,
     });
-  } catch (error) {
-    console.error("❌ Xatolik /add API da:", error);
-    res.status(500).json({
-      message: "Serverda xatolik yuz berdi",
-      error: error.message,
-    });
+  } catch (err) {
+    console.error("❌ /add API xatosi:", err);
+    res.status(500).json({ message: "Server xatosi", error: err.message });
   }
 });
 
@@ -102,8 +138,11 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
   try {
     const { pendingId, address } = req.params;
 
-    if (!pendingId || !address)
-      return res.status(400).json({ message: "pendingId va address kerak" });
+    if (!pendingId || !address) {
+      return res
+        .status(400)
+        .json({ message: "pendingId va address parametrlari kerak" });
+    }
 
     const pending = await PendingProduct.findById(pendingId).populate(
       "product createdBy buyer"
@@ -112,32 +151,14 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
     if (!pending)
       return res.status(404).json({ message: "PendingProduct topilmadi" });
 
-    const { product = {}, createdBy: seller = {}, buyer = {} } = pending;
+    const { product, createdBy: seller, buyer } = pending;
 
-    if (!product.left || product.left < pending.quantity) {
-      if (seller.chatId && !product._notified) {
-        await sendNotification(
-          seller,
-          `⚠️ ${product.name} mahsulotingiz sotuvda qolmadi.\nAgar omborda bo'lsa saytga kirib yangilang!`
-        );
-        product._notified = true;
-        await product.save();
-      }
+    // Omborda mahsulot miqdorini kamaytirish
+    product.left -= pending.quantity;
+    if (product.left < 0) product.left = 0;
+    await product.save();
 
-      await PendingProduct.findByIdAndDelete(pendingId);
-
-      if (buyer.chatId) {
-        await sendNotification(
-          buyer,
-          `❌ Afsuski, siz buyurtma qilgan ${product.name} mahsuloti omborda qolmagan.`
-        );
-      }
-
-      return res
-        .status(400)
-        .json({ message: "❌ Bu mahsulot sotuvda qolmagan" });
-    }
-
+    // Yetkazib berish modelini yaratish
     const newDelivery = new DeliveryProduct({
       image: product.image || "",
       name: product.name || "",
@@ -154,18 +175,6 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
     });
 
     await newDelivery.save();
-
-    product.left -= pending.quantity;
-
-    if (product.left <= 0 && seller.chatId && !product._notified) {
-      await sendNotification(
-        seller,
-        `⚠️ ${product.name} mahsulotingiz sotuvda qolmadi.\nAgar omborda bo'lsa saytga kirib yangilang!`
-      );
-      product._notified = true;
-    }
-
-    await product.save();
     await PendingProduct.findByIdAndDelete(pendingId);
 
     await sendNotification(
@@ -173,12 +182,54 @@ router.post("/add/:pendingId/:address", tokenCheck, async (req, res) => {
       `✅ Sizning ${product.name} mahsulotingiz tasdiqlandi va tez orada yetkazib beriladi.`
     );
 
+    if (product.left <= 0 && seller.chatId && !product._notified) {
+      await sendNotification(
+        seller,
+        `⚠️ ${product.name} mahsulotingiz omborda qolmagan. Yangilashingizni tavsiya qilamiz.`
+      );
+      product._notified = true;
+      await product.save();
+    }
+
     res.json({
       message: "✅ Mahsulot yetkazish jarayoniga o‘tkazildi",
       delivery: newDelivery,
     });
   } catch (err) {
-    console.error(err);
+    console.error("❌ /add/:pendingId/:address xatosi:", err);
+    res.status(500).json({ message: "Server xatosi", error: err.message });
+  }
+});
+
+/**
+ * 👤 3-API: Mening pending buyurtmalarim
+ */
+router.get("/my-pending/buyer", tokenCheck, async (req, res) => {
+  try {
+    const pendingOrders = await PendingProduct.find({
+      buyer: req.userId,
+    })
+      .populate("product")
+      .populate("createdBy", "name userName");
+
+    const formattedOrders = pendingOrders.map((order) => {
+      const obj = order.toObject();
+      const product = obj.product || {};
+      if (product._id && product.images && product.images.length > 0) {
+        product.images = product.images.map(
+          (_, index) =>
+            `${process.env.URL}/api/products/product/${product._id}/image/${index}`
+        );
+      } else {
+        product.images = [];
+      }
+      obj.product = product;
+      return obj;
+    });
+
+    res.json(formattedOrders);
+  } catch (err) {
+    console.error("my-pending/buyer xatosi:", err);
     res.status(500).json({ message: "Server xatosi" });
   }
 });
